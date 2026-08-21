@@ -1,1 +1,1 @@
-﻿# GenAI - CampusFlow AI
+﻿# GenAI 
