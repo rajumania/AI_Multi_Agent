@@ -1,0 +1,41 @@
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import Optional
+
+from backend.database.database import get_db
+from backend.models.telemetry import TelemetryIngestRequest, TelemetryIngestResponse
+from backend.services.telemetry_service import telemetry_service
+
+router = APIRouter(prefix="/api/v1/telemetry", tags=["Live Telemetry & GPS"])
+
+
+@router.post("/location", response_model=TelemetryIngestResponse)
+def post_vehicle_telemetry(
+    payload: TelemetryIngestRequest,
+    x_gps_device_token: Optional[str] = Header(None, alias="X-GPS-Device-Token"),
+    db: Session = Depends(get_db)
+):
+    """
+    Real GPS Telemetry Ingestion Endpoint.
+    Validates device authentication, coordinate sanity, updates SQLite state, and broadcasts live WebSocket event.
+    """
+    res = telemetry_service.process_telemetry(
+        vehicle_id=payload.vehicle_id,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        speed=payload.speed,
+        heading=payload.heading,
+        accuracy=payload.accuracy,
+        timestamp_str=payload.timestamp or "",
+        auth_secret=x_gps_device_token,
+        db=db
+    )
+    return TelemetryIngestResponse(**res)
+
+
+@router.get("/status/{vehicle_id}")
+def get_vehicle_gps_status(vehicle_id: str):
+    """
+    Returns strict live GPS status (LIVE, STALE, LOST, OFFLINE) and telemetry freshness for vehicle.
+    """
+    return telemetry_service.get_gps_status(vehicle_id)

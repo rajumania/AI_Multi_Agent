@@ -51,8 +51,8 @@ export const ResponsesPage: React.FC = () => {
     <div className="app-content">
       <div className="dashboard-title-row">
         <div>
-          <h2>Response Plans & Human Authorization Board</h2>
-          <p>Action plans compiled by AI synthesizing Incident details, Specialized Agent recommendations, and MCP physical assets.</p>
+          <h2>Emergency Response Plans & Authorization Board</h2>
+          <p>Operational action plans formulated from emergency assessments, campus safety protocols, and verified resource coordination.</p>
         </div>
 
         <div className="quick-actions-group">

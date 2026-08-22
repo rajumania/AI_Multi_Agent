@@ -6,7 +6,8 @@ import {
   MultiAgentOrchestrationResponse,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Keep the backend host explicit for local demos; VITE_API_BASE_URL remains the override.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
 export interface CreateIncidentPayload {
   description: string;
@@ -199,8 +200,142 @@ export const api = {
       throw new Error(err.detail || `Incident resolution failed: ${response.status}`);
     }
     return response.json();
+  },
+
+  async confirmResponse(incidentId: string, notes?: string, confirmedBy: string = 'Authorized Campus Operator'): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/incidents/${incidentId}/confirm-response`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: notes || 'Response team confirmed on-scene and active handling underway.', confirmed_by: confirmedBy }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Confirm response failed' }));
+      throw new Error(err.detail || `Confirm response failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async closeIncident(incidentId: string, closingNotes?: string, closedBy: string = 'Authorized Campus Operator'): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/incidents/${incidentId}/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ closing_notes: closingNotes || 'Incident record administratively finalized and archived.', closed_by: closedBy }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Close incident failed' }));
+      throw new Error(err.detail || `Close incident failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async startSimulation(scenarioKey: string = 'ublock_fire'): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/simulation/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario_key: scenarioKey }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Simulation start failed' }));
+      throw new Error(err.detail || `Simulation start failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async injectResourceFailure(incidentId: string, failedResourceId: string = 'AMB-001'): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/simulation/fail-resource`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ incident_id: incidentId, failed_resource_id: failedResourceId }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Failure injection failed' }));
+      throw new Error(err.detail || `Failure injection failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getDecisionTrace(incidentId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/simulation/trace/${incidentId}`);
+    if (!response.ok) {
+      return { incident_id: incidentId, trace: [], count: 0 };
+    }
+    return response.json();
+  },
+
+  async blockRoad(nodeA: string, nodeB: string, blocked: boolean = true): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/simulation/block-road`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ node_a: nodeA, node_b: nodeB, blocked }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Failed to block road' }));
+      throw new Error(err.detail || `Block road failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async calculateRoute(origin: string, destination: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/routes/calculate?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to calculate route: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async login(username: string, password: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Login failed' }));
+      throw new Error(err.detail || `Login failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async signup(payload: any): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Signup failed' }));
+      throw new Error(err.detail || `Signup failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getSystemStatus(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/system/status`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch system status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async sendTelemetry(payload: { vehicle_id: string; latitude: number; longitude: number; speed?: number; heading?: number; accuracy?: number; timestamp?: string }, deviceToken: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/telemetry/location`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-GPS-Device-Token': deviceToken }, body: JSON.stringify(payload) });
+    if (!response.ok) throw new Error('Telemetry rejected');
+    return response.json();
+  },
+
+  async generateVoiceAudio(text: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/voice/generate-audio`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to generate voice audio: ${response.status}`);
+    }
+    return response.json();
   }
 };
+
 
 
 

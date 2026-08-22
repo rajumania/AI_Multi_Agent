@@ -19,12 +19,22 @@ export type SeverityLevel =
 export type IncidentStatus =
   | 'reported'
   | 'analyzing'
+  | 'assessing'
   | 'classified'
+  | 'planning'
   | 'response_planning'
   | 'awaiting_approval'
   | 'approved'
+  | 'authorized'
   | 'rejected'
-  | 'resolved';
+  | 'in_progress'
+  | 'response_in_progress'
+  | 'dispatched'
+  | 'monitoring'
+  | 'resolved'
+  | 'closed'
+  | 'cancelled'
+  | 'action_failed';
 
 export interface Incident {
   incident_id: string;
@@ -36,8 +46,13 @@ export interface Incident {
   evidence_source?: string;
   reported_by?: string;
   status: IncidentStatus;
+  current_step?: string;
+  next_action?: string;
   summary?: string;
   confidence?: number;
+  resolved_at?: string;
+  closed_at?: string;
+  resolution_note?: string;
   created_at: string;
   updated_at: string;
 }
@@ -206,6 +221,15 @@ export interface HealthResponse {
   database: string;
   seeded_resources: number;
   timestamp: string;
+}
+
+export interface LiveEvent {
+  event_name: string;
+  incident_id?: string;
+  timestamp: string;
+  time_display?: string;
+  description?: string;
+  [key: string]: any;
 }
 
 

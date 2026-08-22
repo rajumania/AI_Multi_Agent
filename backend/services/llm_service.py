@@ -109,24 +109,38 @@ class LLMService:
         else:
             incident_type = "unknown"
 
-        # 2. Location Extraction (Specific campus buildings prioritized over generic terms)
-        location = "Campus Premises"
-        if "cse" in text:
-            location = "CSE Block"
-        elif "medical center" in text or "health center" in text:
-            location = "Central Medical Center"
-        elif "auditorium" in text:
-            location = "North Auditorium"
-        elif "sports" in text or "arena" in text or "stadium" in text:
-            location = "Sports Complex Arena"
-        elif "science" in text or "lab" in text or "chemistry" in text:
-            location = "Science & Tech Hub"
-        elif "hostel" in text or "dorm" in text or "residence" in text:
-            location = "Student Residential Quarters"
+        # 2. Location Extraction (Specific Vignan University campus buildings prioritized over generic terms)
+        location = "Vignan University Main Campus"
+        if "u-block" in text or "u block" in text:
+            location = "U-Block (CSE & IT)"
+        elif "cse" in text:
+            location = "U-Block (CSE & IT)"
+        elif "a-block" in text or "a block" in text or "admin" in text or "registrar" in text or "vc office" in text:
+            location = "A-Block (Administrative Block)"
+        elif "h-block" in text or "h block" in text or "biotech" in text:
+            location = "H-Block (Biotechnology & Science)"
+        elif "v-block" in text or "v block" in text or "mechanical" in text or "workshop" in text:
+            location = "V-Block (Mechanical & Civil Engineering)"
+        elif "library" in text or "ntr library" in text:
+            location = "NTR Central Library"
+        elif "medical center" in text or "health center" in text or "dispensary" in text or "first aid" in text:
+            location = "Campus Health & Medical Centre"
+        elif "auditorium" in text or "convocation" in text or "vignan vihar" in text or "oat" in text:
+            location = "NTR Convocation Hall & Auditorium"
+        elif "sports" in text or "arena" in text or "stadium" in text or "ground" in text:
+            location = "Sports Complex & Indoor Stadium"
+        elif "sac" in text or "activity center" in text or "cafeteria" in text or "canteen" in text or "food court" in text:
+            location = "Student Activity Center (SAC) & Food Court"
+        elif "science" in text or "chemistry" in text:
+            location = "H-Block Science Labs"
+        elif "hostel" in text or "dorm" in text or "residence" in text or "mahalakshmi" in text or "vasishta" in text:
+            location = "Mahalakshmi & Vasishta Hostels"
+        elif "pharmacy" in text or "bio-nest" in text:
+            location = "Pharmacy Block & Bio-Nest Hub"
         elif "data center" in text or "server room" in text:
-            location = "Data Center"
-        elif "gate" in text or "entrance" in text:
-            location = "Main Entrance Gate"
+            location = "U-Block Data Center"
+        elif "gate" in text or "entrance" in text or "vadlamudi" in text:
+            location = "Main Vadlamudi Entrance Gate"
 
         # 3. Casualties / Injured Count (Strict Safety: Never force 0 if unknown!)
         injured_count = None

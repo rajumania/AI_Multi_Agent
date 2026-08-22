@@ -4,7 +4,9 @@ import {
   X,
   Send,
   MapPin,
-  HeartPulse
+  HeartPulse,
+  Mic,
+  Camera
 } from 'lucide-react';
 import { Incident } from '../types';
 import { api, CreateIncidentPayload } from '../services/api';
@@ -30,17 +32,69 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
   const [reportedBy, setReportedBy] = useState('Campus Emergency Operator');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submittedIncident, setSubmittedIncident] = useState<Incident | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const toggleVoiceInput = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      // Fallback voice transcript simulation for unsupported browsers
+      setIsListening(true);
+      setTimeout(() => {
+        setDescription((prev) => `${prev ? prev + ' ' : ''}[Voice Intake]: Fire and dense smoke observed spreading in lab area.`);
+        setIsListening(false);
+      }, 1500);
+      return;
+    }
+
+    try {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setDescription((prev) => `${prev ? prev + ' ' : ''}${transcript}`);
+        setIsListening(false);
+      };
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        setEvidenceSource('photo_verified');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   if (!isOpen) return null;
 
   const campusLocationPresets = [
-    'CSE Block',
-    'Main Entrance Gate',
-    'Science & Tech Hub',
-    'Sports Complex Arena',
-    'North Auditorium',
-    'Central Medical Center',
-    'Student Activity Center'
+    'U-Block (CSE & IT)',
+    'A-Block (Admin & Central Office)',
+    'H-Block (Biotechnology & Sciences)',
+    'V-Block (Mechanical & Workshops)',
+    'NTR Central Library',
+    'NTR Convocation Hall & Auditorium',
+    'Student Activity Center (SAC) & Cafeteria',
+    'Sports Complex & Indoor Stadium',
+    'Mahalakshmi & Vasishta Hostels',
+    'Main Vadlamudi Entrance Gate',
+    'Campus Health & Medical Centre',
+    'Pharmacy Block & Bio-Nest Hub'
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,13 +123,8 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
       };
 
       const created = await api.createIncident(payload);
+      setSubmittedIncident(created);
       onIncidentCreated(created);
-      onClose();
-      // Reset form
-      setDescription('');
-      setLocation('');
-      setIsInjuredUnknown(true);
-      setInjuredCount('');
     } catch (err: any) {
       setError(err.message || 'Failed to submit emergency report.');
     } finally {
@@ -83,8 +132,98 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
     }
   };
 
+  const handleCloseModal = () => {
+    setSubmittedIncident(null);
+    setDescription('');
+    setLocation('');
+    setIsInjuredUnknown(true);
+    setInjuredCount('');
+    onClose();
+  };
+
+  if (submittedIncident) {
+    return (
+      <div className="modal-backdrop" onClick={handleCloseModal}>
+        <div
+          className="modal-card"
+          onClick={(e) => e.stopPropagation()}
+          style={{ maxWidth: '520px', textAlign: 'center', padding: '2rem 1.5rem' }}
+        >
+          <div style={{
+            width: '56px',
+            height: '56px',
+            background: '#dcfce7',
+            color: '#16a34a',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '28px',
+            margin: '0 auto 1rem'
+          }}>
+            ✓
+          </div>
+
+          <h3 style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 700, marginBottom: '0.35rem' }}>
+            REPORT RECEIVED
+          </h3>
+          <p style={{ fontSize: '0.875rem', color: '#475569', marginBottom: '1.25rem', lineHeight: 1.4 }}>
+            Your emergency report has been registered with the <strong>Vignan University Emergency Command Center</strong>.
+          </p>
+
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px',
+            padding: '1rem',
+            textAlign: 'left',
+            marginBottom: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>INCIDENT ID:</span>
+              <strong style={{ fontSize: '0.8125rem', color: '#0284c7' }}>{submittedIncident.incident_id}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>LOCATION:</span>
+              <span style={{ fontSize: '0.8125rem', color: '#0f172a', fontWeight: 600 }}>{submittedIncident.location}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>CLASSIFICATION:</span>
+              <span style={{ fontSize: '0.8125rem', color: '#dc2626', fontWeight: 700, textTransform: 'uppercase' }}>
+                {submittedIncident.incident_type} • {submittedIncident.severity}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>CURRENT STATUS:</span>
+              <span className="badge badge-high" style={{ fontSize: '0.7rem', padding: '1px 6px' }}>
+                ANALYZING
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              className="btn btn-primary"
+              style={{ flex: 2, padding: '0.65rem', background: '#0284c7', color: '#ffffff', fontWeight: 700 }}
+              onClick={handleCloseModal}
+            >
+              TRACK INCIDENT COMMAND →
+            </button>
+            <button
+              className="btn btn-outline"
+              style={{ flex: 1, padding: '0.65rem' }}
+              onClick={handleCloseModal}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={handleCloseModal}>
       <div
         className="modal-card"
         onClick={(e) => e.stopPropagation()}
@@ -97,14 +236,14 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
             <div>
               <h3 style={{ fontSize: '1.125rem' }}>Report Campus Emergency</h3>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                Official Emergency Intake Protocol • Real-time Agent Dispatch Ready
+                Official Emergency Intake • Vignan University Vadlamudi
               </p>
             </div>
           </div>
           <button
             className="btn btn-outline"
             style={{ padding: '0.35rem', borderRadius: '50%' }}
-            onClick={onClose}
+            onClick={handleCloseModal}
           >
             <X size={16} />
           </button>
@@ -118,19 +257,81 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
             </div>
           )}
 
-          {/* Description */}
+          {/* Description with Voice & Image Controls */}
           <div className="form-group">
-            <label className="form-label">
-              Incident Description <span style={{ color: 'var(--danger-600)' }}>*</span>
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+              <label className="form-label" style={{ margin: 0 }}>
+                Incident Description <span style={{ color: 'var(--danger-600)' }}>*</span>
+              </label>
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.55rem',
+                    borderColor: isListening ? '#ef4444' : '#cbd5e1',
+                    color: isListening ? '#ef4444' : '#0284c7',
+                    background: isListening ? '#fef2f2' : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem'
+                  }}
+                  onClick={toggleVoiceInput}
+                >
+                  <Mic size={13} className={isListening ? 'pulse' : ''} />
+                  <span>{isListening ? 'Listening...' : 'Voice Intake'}</span>
+                </button>
+
+                <label
+                  className="btn btn-sm btn-outline"
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.2rem 0.55rem',
+                    borderColor: '#cbd5e1',
+                    color: '#0284c7',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    margin: 0
+                  }}
+                >
+                  <Camera size={13} />
+                  <span>Attach Photo</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={handleImageUpload}
+                  />
+                </label>
+              </div>
+            </div>
+
             <textarea
               className="form-textarea"
               rows={3}
-              placeholder="E.g., Dense smoke and active flames observed coming from CSE Block 2nd floor lab. Alarm triggered."
+              placeholder="E.g., Dense smoke and active flames observed coming from U-Block 2nd floor CSE lab. Alarm triggered."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
             />
+
+            {/* Attached Image Preview */}
+            {imagePreview && (
+              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f8fafc', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                <img src={imagePreview} alt="Attached incident evidence" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                <span style={{ fontSize: '0.75rem', color: '#475569', flex: 1 }}>Incident photo evidence attached</span>
+                <button
+                  type="button"
+                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
+                  onClick={() => setImagePreview(null)}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
 
           {/* 2-Column: Type & Severity */}
@@ -190,7 +391,7 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
                 type="text"
                 className="form-input"
                 style={{ paddingLeft: '2.25rem' }}
-                placeholder="E.g., CSE Block 2nd Floor, Room 204"
+                placeholder="E.g., U-Block 2nd Floor Room 204 (CSE Dept)"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 required

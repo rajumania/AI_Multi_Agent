@@ -27,14 +27,22 @@ class SeverityLevel(str, Enum):
 class IncidentStatus(str, Enum):
     REPORTED = "reported"
     ANALYZING = "analyzing"
+    ASSESSING = "assessing"
     CLASSIFIED = "classified"
+    PLANNING = "planning"
     RESPONSE_PLANNING = "response_planning"
     AWAITING_APPROVAL = "awaiting_approval"
     APPROVED = "approved"
+    AUTHORIZED = "authorized"
     REJECTED = "rejected"
     IN_PROGRESS = "in_progress"
+    RESPONSE_IN_PROGRESS = "response_in_progress"
     DISPATCHED = "dispatched"
+    MONITORING = "monitoring"
     RESOLVED = "resolved"
+    CLOSED = "closed"
+    CANCELLED = "cancelled"
+    ACTION_FAILED = "action_failed"
 
 
 
@@ -69,11 +77,26 @@ class IncidentCreate(IncidentBase):
     pass
 
 
+class IncidentCloseRequest(BaseModel):
+    closed_by: str = Field(default="Authorized Campus Operator")
+    closing_notes: Optional[str] = Field(default="Incident record administratively finalized and archived.")
+
+
+class IncidentConfirmResponseRequest(BaseModel):
+    confirmed_by: str = Field(default="Authorized Campus Operator")
+    notes: Optional[str] = Field(default="First responders confirmed arrival on-scene and active management underway.")
+
+
 class IncidentRead(IncidentBase):
     incident_id: str
     status: IncidentStatus = IncidentStatus.REPORTED
+    current_step: Optional[str] = None
+    next_action: Optional[str] = None
     summary: Optional[str] = None
     confidence: Optional[float] = None
+    resolved_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    resolution_note: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

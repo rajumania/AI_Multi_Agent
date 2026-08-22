@@ -10,6 +10,7 @@ from backend.models.incident import IncidentStatus
 from backend.models.response import ResponsePlanRead, ApprovalStatus
 from backend.graph.workflow import run_emergency_workflow
 from backend.services.audit_service import audit_service
+from backend.services.event_engine import event_engine
 
 
 def generate_plan_id() -> str:
@@ -81,8 +82,10 @@ class ResponseService:
 
         db.add(plan_db)
 
-        # Update Incident status
+        # Update Incident status and operational progress
         incident.status = IncidentStatus.AWAITING_APPROVAL.value
+        incident.current_step = "Recommended response plan prepared. Awaiting commander authorization."
+        incident.next_action = "Authorized operator must review recommended response and authorize dispatch."
         incident.updated_at = now
         db.commit()
         db.refresh(plan_db)
@@ -90,10 +93,10 @@ class ResponseService:
         # 4. Audit Logging
         audit_service.log(
             action_type="response_plan_generated",
-            description=f"AI Response Planner generated action plan {plan_id} with {len(recommended_actions)} action(s) and {len(allocated_resource_ids)} MCP resource(s).",
+            description=f"Response plan prepared with {len(recommended_actions)} action(s) and {len(allocated_resource_ids)} assigned resource(s).",
             incident_id=incident.incident_id,
             plan_id=plan_id,
-            actor="response_planner",
+            actor="System",
             details={
                 "actions": recommended_actions,
                 "resources": allocated_resource_ids,
@@ -105,13 +108,26 @@ class ResponseService:
         if requires_approval:
             audit_service.log(
                 action_type="approval_requested",
-                description=f"Human commander approval requested for plan {plan_id} ({len(required_approvals)} high-impact action(s)).",
+                description=f"Commander authorization requested for emergency response at {incident.location}.",
                 incident_id=incident.incident_id,
                 plan_id=plan_id,
-                actor="system",
+                actor="System",
                 details={"required_approvals": required_approvals},
                 db=db
             )
+
+        event_engine.publish_event(
+            event_name="response_plan_generated",
+            incident_id=incident.incident_id,
+            payload={
+                "event_name": "response_plan_generated",
+                "plan_id": plan_id,
+                "description": f"Response plan generated with {len(allocated_resource_ids)} assigned resource(s).",
+                "allocated_resources": allocated_resource_ids,
+                "approval_status": plan_db.approval_status,
+            },
+            db=db,
+        )
 
         return plan_db
 
@@ -143,13 +159,19 @@ class ResponseService:
         now = datetime.now(timezone.utc)
         plan.approval_status = new_status
         plan.approved_by = operator_name
-        plan.approval_notes = notes or ("Approved for execution." if is_approved else "Rejected by operator.")
+        plan.approval_notes = notes or ("Approved for emergency execution." if is_approved else "Rejected by safety commander.")
         plan.updated_at = now
 
         # Update parent incident
         incident = db.query(IncidentDB).filter(IncidentDB.incident_id == plan.incident_id).first()
         if incident:
             incident.status = IncidentStatus.APPROVED.value if is_approved else IncidentStatus.REJECTED.value
+            if is_approved:
+                incident.current_step = f"Emergency response authorized by {operator_name}."
+                incident.next_action = "Initiate response workflow and notify physical dispatch units."
+            else:
+                incident.current_step = f"Response plan rejected by {operator_name}."
+                incident.next_action = "Re-assess emergency parameters or prepare alternate plan."
             incident.updated_at = now
 
         db.commit()
@@ -158,7 +180,7 @@ class ResponseService:
         # Audit Logging
         audit_service.log(
             action_type="approval_decision",
-            description=f"Operator '{operator_name}' {new_status.upper()} plan {plan_id}. Notes: {plan.approval_notes}",
+            description=f"Response plan {new_status.upper()} by {operator_name}. Note: {plan.approval_notes}",
             incident_id=plan.incident_id,
             plan_id=plan.plan_id,
             actor=operator_name,
@@ -168,6 +190,18 @@ class ResponseService:
                 "operator": operator_name
             },
             db=db
+        )
+
+        event_engine.publish_event(
+            event_name="approval_granted" if is_approved else "approval_rejected",
+            incident_id=plan.incident_id,
+            payload={
+                "event_name": "approval_granted" if is_approved else "approval_rejected",
+                "plan_id": plan.plan_id,
+                "description": "Response plan authorized for emergency execution." if is_approved else "Response plan rejected by commander.",
+                "approval_status": new_status,
+            },
+            db=db,
         )
 
         return plan

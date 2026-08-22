@@ -19,8 +19,13 @@ class IncidentDB(Base):
     evidence_source = Column(String(100), nullable=True)
     reported_by = Column(String(100), default="Campus Operator")
     status = Column(String(50), default="reported", index=True)
+    current_step = Column(String(200), default="Emergency report received and logged in system.")
+    next_action = Column(String(200), default="Intake assessment and category classification.")
     summary = Column(Text, nullable=True)
     confidence = Column(Float, nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    closed_at = Column(DateTime(timezone=True), nullable=True)
+    resolution_note = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
@@ -71,4 +76,16 @@ class AuditLogDB(Base):
     description = Column(Text, nullable=False)
     details = Column(Text, nullable=True)  # JSON serialized payload
     timestamp = Column(DateTime(timezone=True), default=utc_now, index=True)
+
+
+class UserDB(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(50), unique=True, index=True, nullable=False)
+    hashed_password = Column(String(100), nullable=False)
+    role = Column(String(50), default="operator")  # "operator" | "student"
+    full_name = Column(String(100), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
 

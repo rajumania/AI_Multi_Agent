@@ -52,8 +52,8 @@ export const ActivityPage: React.FC = () => {
     <div className="app-content">
       <div className="dashboard-title-row">
         <div>
-          <h2>System Audit & Compliance Activity Feed</h2>
-          <p>Immutable event stream recording incident creation, AI analysis, MCP queries, human approvals, and automated dispatch.</p>
+          <h2>Operational Activity & Emergency Event Stream</h2>
+          <p>Immutable event stream recording incident creation, intake assessments, resource checks, commander authorizations, and emergency dispatch.</p>
         </div>
 
         <div className="quick-actions-group">

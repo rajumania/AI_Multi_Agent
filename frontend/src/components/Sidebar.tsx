@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   AlertTriangle,
   Layers,
-  Bot,
   FileCheck,
   History,
   ShieldCheck
@@ -18,10 +17,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
-    { id: 'resources', label: 'Resources', icon: Layers },
-    { id: 'agents', label: 'Agents', icon: Bot },
+    { id: 'resources', label: 'Campus Resources', icon: Layers },
     { id: 'responses', label: 'Response Plans', icon: FileCheck },
-    { id: 'activity', label: 'Activity', icon: History },
+    { id: 'activity', label: 'Activity Logs', icon: History },
   ];
 
   return (

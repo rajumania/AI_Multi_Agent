@@ -7,7 +7,7 @@ from sqlalchemy import text
 
 from backend.config import settings
 from backend.database.database import engine, Base, get_db, SessionLocal
-from backend.database.seed import seed_resources
+from backend.database.seed import seed_resources, seed_users
 from backend.database.models import CampusResourceDB
 from backend.api.incidents import router as incidents_router
 from backend.api.resources import router as resources_router
@@ -15,6 +15,13 @@ from backend.api.responses import router as responses_router
 from backend.api.approvals import router as approvals_router
 from backend.api.audit import router as audit_router
 from backend.api.dispatch import router as dispatch_router
+from backend.api.simulation import router as simulation_router
+from backend.api.events import router as events_router
+from backend.api.routes import router as routes_router
+from backend.api.auth import router as auth_router
+from backend.api.telemetry import router as telemetry_router
+from backend.api.voice import router as voice_router
+from backend.api.system import router as system_router
 
 
 @asynccontextmanager
@@ -25,6 +32,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed_resources(db)
+        seed_users(db)
     finally:
         db.close()
     yield
@@ -42,6 +50,8 @@ origins = [
     settings.FRONTEND_URL,
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
     "http://localhost:3000",
 ]
 
@@ -58,8 +68,16 @@ app.include_router(incidents_router)
 app.include_router(resources_router)
 app.include_router(responses_router)
 app.include_router(approvals_router)
-app.include_router(audit_router)
 app.include_router(dispatch_router)
+app.include_router(audit_router)
+app.include_router(simulation_router)
+app.include_router(events_router)
+app.include_router(routes_router)
+app.include_router(auth_router)
+app.include_router(telemetry_router)
+app.include_router(voice_router)
+app.include_router(system_router)
+
 
 
 

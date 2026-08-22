@@ -31,9 +31,9 @@ def test_resources_have_valid_spatial_coordinates(client):
     for r in resources:
         assert r["latitude"] is not None
         assert r["longitude"] is not None
-        # Campus GPS bounding box check (Hyderabad / Campus vicinity)
-        assert 17.0 <= r["latitude"] <= 18.0
-        assert 78.0 <= r["longitude"] <= 79.0
+        # Campus GPS bounding box check (Vignan University, Vadlamudi, Guntur vicinity)
+        assert 16.0 <= r["latitude"] <= 17.0
+        assert 80.0 <= r["longitude"] <= 81.0
 
 
 def test_spatial_query_by_resource_type(client):

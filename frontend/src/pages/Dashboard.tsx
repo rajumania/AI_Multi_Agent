@@ -3,18 +3,20 @@ import {
   AlertTriangle,
   Flame,
   Layers,
-  Bot,
+  ShieldCheck,
   PlusCircle,
   RotateCcw,
   Clock,
   HeartPulse,
   ArrowRight
 } from 'lucide-react';
-import { HealthResponse, Incident } from '../types';
+import { HealthResponse, Incident, LiveEvent, ResponsePlan } from '../types';
 import { MetricCard } from '../components/MetricCard';
 import { CampusMap } from '../components/CampusMap';
 import { RecentActivityPlaceholder } from '../components/RecentActivityPlaceholder';
 import { ResourceBreakdownWidget } from '../components/ResourceBreakdownWidget';
+import { SimulationControls } from '../components/SimulationControls';
+import { OperatorLocation, RealOperationsControls } from '../components/RealOperationsControls';
 
 
 interface DashboardProps {
@@ -24,7 +26,51 @@ interface DashboardProps {
   onRefresh: () => void;
   onOpenReportModal: () => void;
   onNavigateToIncidents: () => void;
+  onSelectIncident?: (incident: Incident) => void;
+  activeIncident?: Incident;
+  responsePlan?: ResponsePlan | null;
+  assignedResources?: string[];
+  timeline?: LiveEvent[];
+  workflowStatus?: string;
+  workflowError?: string | null;
+  demoPushVisible?: boolean;
+  wsState?: 'CONNECTED' | 'CONNECTING' | 'OFFLINE';
+  operatorLocation?: OperatorLocation | null;
+  onClientEvent?: (event: LiveEvent) => void;
+  onGpsLocation?: (location: OperatorLocation | null) => void;
+  onResolveIncident?: (incident: Incident) => void;
+  onViewResponsePlan?: () => void;
 }
+
+const timelineLabel = (eventName: string) => {
+  const labels: Record<string, string> = {
+    incident_created: 'Incident reported',
+    incident_reported_client: 'Incident reported',
+    ai_analysis_completed: 'AI Incident Analysis completed',
+    resources_verified: 'Campus resources identified',
+    response_plan_generated_client: 'Response plan generated',
+    approval_granted_client: 'Response plan authorized',
+    dispatch_started_client: 'Responder/resource assignment started',
+    incident_updated: 'Severity classified',
+    workflow_started: 'AI Incident Analysis started',
+    agent_started: 'AI agent started',
+    agent_completed: 'AI agent completed',
+    response_plan_updated: 'Response plan preparation completed',
+    response_plan_generated: 'Response plan generated',
+    resource_verified: 'Campus resources verified',
+    approval_granted: 'Response plan authorized',
+    dispatch_started: 'Response dispatch started',
+    resource_dispatched: 'Responder/resource assigned',
+    vehicle_location_updated: 'Responder location updated',
+    voice_alert_started: 'Voice emergency alert started',
+    demo_push_available: 'Demo push notification displayed',
+    demo_push_displayed: 'Demo push notification displayed',
+    voice_alert_muted: 'Voice alert muted by operator',
+    voice_alert_stopped: 'Voice alert stopped by operator',
+    incident_resolved: 'Incident resolved',
+  };
+  return labels[eventName] || eventName.split('_').join(' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase());
+};
 
 export const Dashboard: React.FC<DashboardProps> = ({
   health,
@@ -33,17 +79,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onRefresh,
   onOpenReportModal,
   onNavigateToIncidents,
+  onSelectIncident,
+  activeIncident,
+  responsePlan,
+  assignedResources = [],
+  timeline = [],
+  workflowStatus = 'STANDING BY',
+  workflowError,
+  demoPushVisible = false,
+  wsState = 'OFFLINE',
+  operatorLocation,
+  onClientEvent,
+  onGpsLocation,
+  onResolveIncident,
+  onViewResponsePlan,
 }) => {
   const resourceCount = health?.seeded_resources ?? 13;
-  const activeIncidents = incidents.filter((i) => i.status !== 'resolved');
-  const criticalIncidents = incidents.filter((i) => i.severity === 'critical');
+  const activeIncidents = incidents.filter((i) => i.status !== 'resolved' && i.status !== 'closed');
+  const latestActiveId = activeIncidents.length > 0 ? activeIncidents[0].incident_id : undefined;
 
   return (
     <div className="app-content">
+      {/* Digital Twin Autonomous Simulation Bar */}
+      <SimulationControls
+        activeIncidentId={latestActiveId}
+        onRefresh={onRefresh}
+        onScenarioStarted={(inc) => {
+          if (onSelectIncident) {
+            onSelectIncident(inc);
+          } else {
+            onNavigateToIncidents();
+          }
+        }}
+      />
+      <RealOperationsControls incident={activeIncident || activeIncidents[0]} wsState={wsState} demoPushVisible={demoPushVisible} onClientEvent={onClientEvent} onGpsLocation={onGpsLocation} />
+
+      {activeIncident && (
+        <div className="command-center-grid">
+          <section className="active-emergency-card">
+            <div className="active-emergency-heading"><span className="live-pulse-dot" /> ACTIVE EMERGENCY <span className="workflow-chip">{workflowStatus}</span></div>
+            <div className="active-emergency-body">
+              <div><small>INCIDENT</small><strong>{activeIncident.incident_type.toUpperCase()} — {activeIncident.location}</strong><span>{activeIncident.description}</span></div>
+              <div className="emergency-facts"><div><small>SEVERITY</small><strong>{activeIncident.severity.toUpperCase()}</strong></div><div><small>STATUS</small><strong>RESPONSE IN PROGRESS</strong></div><div><small>AI ASSESSMENT</small><strong>{activeIncident.summary ? 'COMPLETED' : 'PROCESSING'}</strong></div><div><small>RESPONSE PLAN</small><strong>{responsePlan ? 'ACTIVE' : 'PROCESSING'}</strong></div><div><small>RESPONDERS</small><strong>{assignedResources.length || 'COORDINATING'}</strong></div><div><small>NOTIFICATIONS</small><strong>{demoPushVisible ? 'IN-APP DEMO' : 'STAGING'}</strong></div></div>
+              <div className="emergency-actions"><button className="btn btn-outline" onClick={onViewResponsePlan}>VIEW RESPONSE PLAN</button><button className="btn btn-outline" onClick={() => document.querySelector('.map-command-panel')?.scrollIntoView({ behavior: 'smooth' })}>VIEW MAP</button><button className="btn btn-danger" onClick={() => onResolveIncident?.(activeIncident)}>RESOLVE INCIDENT</button></div>
+            </div>
+          </section>
+          {demoPushVisible && <section className="demo-push-card"><div className="demo-push-label">DEMO PUSH — IN APP</div><h3>CAMPUS EMERGENCY ALERT</h3><strong>{activeIncident.incident_type.toUpperCase()} reported:</strong><p>{activeIncident.location}</p><p>Response teams activated.</p><small>Recipients: Security Team • Medical Team • Evacuation Team</small><em>No external mobile push delivery claimed.</em></section>}
+        </div>
+      )}
+      {workflowError && <div className="alert-banner error" role="alert">{workflowError}</div>}
+
       <div className="dashboard-title-row">
         <div>
           <h2>Campus Operations Command Center</h2>
-          <p>Real-time emergency monitoring, intelligent agent readiness, and campus resource orchestration.</p>
+          <p>Real-time emergency operations, Vignan University campus monitoring, and rapid response coordination.</p>
         </div>
 
         <div className="quick-actions-group">
@@ -74,20 +163,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
           value={activeIncidents.length}
           subtext={
             activeIncidents.length > 0
-              ? `${activeIncidents.length} active emergency stream(s)`
-              : 'Intake pipeline active & ready'
+              ? `${activeIncidents.length} active emergency event(s)`
+              : 'All sectors reported clear'
           }
           icon={AlertTriangle}
           variant={activeIncidents.length > 0 ? 'red' : 'blue'}
         />
 
         <MetricCard
-          label="Critical Severity"
-          value={criticalIncidents.length}
+          label="Critical & High"
+          value={incidents.filter((i) => i.severity === 'critical' || i.severity === 'high').length}
           subtext={
-            criticalIncidents.length > 0
-              ? `${criticalIncidents.length} high priority threat(s)`
-              : 'No active Level 4 escalations'
+            incidents.filter((i) => i.severity === 'critical' || i.severity === 'high').length > 0
+              ? `${incidents.filter((i) => i.severity === 'critical' || i.severity === 'high').length} priority situation(s)`
+              : 'No critical escalations'
           }
           icon={Flame}
           variant="red"
@@ -96,16 +185,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <MetricCard
           label="Available Resources"
           value={resourceCount}
-          subtext={`${resourceCount} emergency assets seeded in DB`}
+          subtext={`${resourceCount} verified campus emergency assets`}
           icon={Layers}
           variant="teal"
         />
 
         <MetricCard
-          label="AI Agent Readiness"
-          value="5 Agents"
-          subtext="Supervisor, Security, Medical, Transport, Comms"
-          icon={Bot}
+          label="Response Operations"
+          value="Level 1"
+          subtext="Security, Medical, Transport & Public Alerts Ready"
+          icon={ShieldCheck}
           variant="green"
         />
       </div>
@@ -135,7 +224,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <strong style={{ fontSize: '0.9375rem', color: 'var(--text-primary)' }}>
                     {incidents[0].location}
                   </strong>
-                  <span className="badge badge-high">{incidents[0].severity.toUpperCase()}</span>
+                  <span className="badge badge-high">{(incidents[0].severity || 'unknown').toUpperCase()}</span>
                 </div>
                 <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
                   {incidents[0].description}
@@ -166,8 +255,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Main 2-Column Section: Map & Activity Feed */}
       <div className="dashboard-columns">
-        <CampusMap incidents={incidents} onSelectIncident={onNavigateToIncidents} />
-        <RecentActivityPlaceholder />
+        <div className="map-command-panel"><CampusMap incidents={incidents} onSelectIncident={onNavigateToIncidents} activeIncidentId={activeIncident?.incident_id} operatorLocation={operatorLocation} /></div>
+        <div className="timeline-column">
+          <section className="panel-card live-timeline-card"><div className="panel-header"><div className="panel-title">LIVE RESPONSE TIMELINE</div><span className="panel-tag">SERVER / CLIENT EVENTS</span></div><div className="timeline-list">{timeline.filter((event) => !activeIncident || !event.incident_id || event.incident_id === activeIncident.incident_id).slice(0, 14).map((event, index) => <div className="timeline-item" key={`${event.timestamp}-${event.event_name}-${index}`}><div className="timeline-time">{event.time_display || new Date(event.timestamp).toLocaleTimeString()}</div><div className="timeline-content"><div className="timeline-title">{timelineLabel(event.event_name)}</div><div className="timeline-desc">{event.description || event.event_name.split('_').join(' ')}</div></div></div>)}{timeline.length === 0 && <div className="empty-timeline">Waiting for live incident events…</div>}</div></section>
+          <RecentActivityPlaceholder />
+        </div>
       </div>
 
 
