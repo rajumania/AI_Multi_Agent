@@ -21,7 +21,7 @@ backend/database/models.py.
 
 from typing import Dict, List, Tuple
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 
 from backend.services.departments import RESOURCE_TYPE_TO_DEPARTMENT
@@ -56,7 +56,7 @@ ADDITIVE_COLUMNS: Dict[str, List[Tuple[str, str, str]]] = {
         ("assignment_id", "INTEGER", None),
         ("route_version", "INTEGER", "1"),
         ("geometry_source", "VARCHAR(60)", None),
-        ("updated_at", "DATETIME", None),
+        ("updated_at", "TIMESTAMP", None),
     ],
     "route_replans": [
         ("assignment_id", "INTEGER", None),
@@ -66,11 +66,13 @@ ADDITIVE_COLUMNS: Dict[str, List[Tuple[str, str, str]]] = {
 
 
 def _existing_columns(conn, table: str) -> List[str]:
-    """Return the column names currently present on ``table`` (empty if none)."""
-    rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
-    # PRAGMA table_info columns: cid, name, type, notnull, dflt_value, pk
-    return [row[1] for row in rows]
+    """Return column names currently present on a table."""
+    inspector = inspect(conn)
 
+    if not inspector.has_table(table):
+        return []
+
+    return [column["name"] for column in inspector.get_columns(table)]
 
 def ensure_schema(engine: Engine) -> Dict[str, List[str]]:
     """Add any missing Increment-1 columns to pre-existing tables.
