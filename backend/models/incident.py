@@ -1,11 +1,14 @@
 from datetime import datetime, timezone
 from enum import Enum
+import json
+import math
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict, model_validator
 
 
 class IncidentType(str, Enum):
     FIRE = "fire"
+    CHEMICAL = "chemical"
     MEDICAL = "medical"
     SECURITY = "security"
     ACCIDENT = "accident"
@@ -58,6 +61,21 @@ class IncidentBase(BaseModel):
     )
     evidence_source: Optional[str] = Field(default="direct_report", description="Origin/source of evidence")
     reported_by: Optional[str] = Field(default="Campus Operator", description="Reporter identifier or role")
+    latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Exact incident latitude when selected")
+    longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0, description="Exact incident longitude when selected")
+
+    @field_validator("latitude", "longitude")
+    @classmethod
+    def validate_finite_coordinate(cls, value):
+        if value is not None and not math.isfinite(value):
+            raise ValueError("Coordinates must be finite numbers.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_coordinate_pair(self):
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("Latitude and longitude must be supplied together.")
+        return self
 
     @field_validator("injured_count", mode="before")
     @classmethod
@@ -90,6 +108,7 @@ class IncidentConfirmResponseRequest(BaseModel):
 class IncidentRead(IncidentBase):
     incident_id: str
     status: IncidentStatus = IncidentStatus.REPORTED
+    ai_provider_status: Optional[str] = None
     current_step: Optional[str] = None
     next_action: Optional[str] = None
     summary: Optional[str] = None
@@ -97,10 +116,22 @@ class IncidentRead(IncidentBase):
     resolved_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
     resolution_note: Optional[str] = None
+    required_departments: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("required_departments", mode="before")
+    @classmethod
+    def parse_required_departments(cls, value):
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, list) else []
+            except (TypeError, ValueError):
+                return []
+        return value or []
 
 
 class SupervisorAnalysisResult(BaseModel):
@@ -140,6 +171,8 @@ class MultiAgentOrchestrationResponse(BaseModel):
     medical_result: Optional[dict] = None
     transport_result: Optional[dict] = None
     communication_result: Optional[dict] = None
+    fire_result: Optional[dict] = None
+    facilities_result: Optional[dict] = None
     mcp_resources: list[dict] = Field(default_factory=list, description="Real physical campus resources discovered via MCP")
     all_recommendations: list[str] = Field(default_factory=list)
     required_approvals: list[str] = Field(default_factory=list)

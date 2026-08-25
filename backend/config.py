@@ -15,8 +15,19 @@ class Settings(BaseSettings):
     
     # AI Configuration
     LLM_PROVIDER: str = "gemini"
+    # Bound external model calls so a provider/network stall cannot hold the
+    # emergency workflow indefinitely. Existing heuristic fallback remains the
+    # provider-failure path after this timeout.
+    LLM_TIMEOUT_SECONDS: float = 10.0
     GEMINI_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
+    AUTOMATIC_AI_WORKFLOW: bool = True
+    # Optional hosted Mem0 Platform memory.  It is deliberately independent
+    # from the emergency workflow: missing configuration disables semantic
+    # memory, it never substitutes local or fabricated memory.
+    MEM0_API_KEY: Optional[str] = None
+    MEM0_ORGANIZATION_ID: Optional[str] = None
+    MEM0_ENABLED: bool = True
     
     # Map & Routing Providers
     MAP_PROVIDER: str = "esri_satellite"
@@ -63,7 +74,18 @@ class Settings(BaseSettings):
 
     # GPS Telemetry Auth Secret
     GPS_TELEMETRY_SECRET: str = "campusflow-secret-telemetry-key"
-    
+
+    # --- Authentication / RBAC (Increment 1) ---
+    # Signing key for auth tokens. Default matches the legacy hardcoded key so
+    # tokens minted before this change remain valid; override via env in prod.
+    AUTH_SECRET_KEY: str = "vignan-university-emergency-intelligence-secret-key"
+    AUTH_TOKEN_TTL_SECONDS: int = 86400  # 24h
+    # Migration flag: when True, existing command-center endpoints that predate
+    # RBAC treat an unauthenticated caller as the privileged operator/admin so
+    # the current single-operator UI keeps working. Set False to fully lock the
+    # backend down (every protected endpoint then requires a valid token).
+    ALLOW_ANONYMOUS_ADMIN: bool = True
+
     # Frontend URL for CORS
     FRONTEND_URL: str = "http://localhost:5173"
     

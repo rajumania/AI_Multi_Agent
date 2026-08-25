@@ -76,7 +76,13 @@ def test_approve_response_plan(client):
     assert approval_res.status_code == 200
     approved_data = approval_res.json()
     assert approved_data["approval_status"] == "approved"
-    assert approved_data["approved_by"] == "Chief Safety Officer Sarah"
+    # SECURITY (Increment 1): the recorded approver is the *authenticated* identity,
+    # NOT the client-supplied `operator_name` in the request body. The endpoint no
+    # longer trusts an arbitrary name from the request. In this legacy compatibility
+    # suite (ALLOW_ANONYMOUS_ADMIN=true) an unauthenticated caller is resolved to the
+    # operator shim whose display name is "Campus Operator". This assertion was
+    # updated from "Chief Safety Officer Sarah" to reflect that required security fix.
+    assert approved_data["approved_by"] == "Campus Operator"
     assert "CCTV" in approved_data["approval_notes"]
 
     # Verify incident status updated
@@ -106,7 +112,10 @@ def test_reject_response_plan(client):
     assert reject_res.status_code == 200
     rejected_data = reject_res.json()
     assert rejected_data["approval_status"] == "rejected"
-    assert rejected_data["approved_by"] == "Commander David"
+    # SECURITY (Increment 1): approver is the authenticated identity, not the
+    # client-supplied `operator_name`. Under the compatibility shim that identity
+    # is "Campus Operator". Updated from "Commander David" for that security fix.
+    assert rejected_data["approved_by"] == "Campus Operator"
 
     # Verify incident status updated
     inc_check = client.get(f"/api/v1/incidents/{inc_id}")

@@ -47,17 +47,18 @@ export const AIDecisionTrace: React.FC<AIDecisionTraceProps> = ({ trace, inciden
     const status = item.status ? item.status.toUpperCase() : 'COMPLETED';
     const task = item.task || item.action?.replace(/_/g, ' ') || 'Operational Assessment';
 
-    // Build operational result from result field, or extract clean summary from thought
-    let result = item.result;
-    if (!result && item.thought) {
-      // Filter out private chain-of-thought and convert to operational statement
-      const cleanThought = item.thought
-        .replace(/Querying MCP resource layer for closest guard squad to .*/, 'Queried MCP layer for closest guard squad.')
-        .replace(/Assessing casualty risk and reserving nearest medical unit for triage.*/, 'Assessed casualty risk and reserved medical unit.')
-        .replace(/Computing clear ingress corridor for dispatched emergency vehicles.*/, 'Computed ingress corridor for emergency transit.')
-        .replace(/Received emergency intake at .*/, 'Received and validated incident intake parameters.')
-        .replace(/Calculated threat score: .*/, 'Deterministic threat score evaluated and applied.');
-      result = cleanThought;
+    // `thought` is backend execution detail. Only expose explicit operational
+    // output (or a concise tool result) in the operator-facing agent response.
+    let result = item.result || item.recommendation;
+    if (!result && item.tool_call?.result && typeof item.tool_call.result === 'object') {
+      const toolResult = item.tool_call.result;
+      const resourceName = toolResult.name || toolResult.resource_id;
+      const availability = toolResult.availability_status;
+      if (resourceName) {
+        result = availability
+          ? `${resourceName} is ${String(availability).replace(/_/g, ' ')}.`
+          : `${resourceName} was verified for this response.`;
+      }
     }
 
     // Extract verified resources if available
@@ -175,7 +176,7 @@ export const AIDecisionTrace: React.FC<AIDecisionTraceProps> = ({ trace, inciden
 
                 {/* Operational Result */}
                 <div style={{ color: '#e2e8f0', marginBottom: '0.35rem', background: '#0f172a', padding: '0.4rem 0.6rem', borderRadius: '4px', border: '1px solid #334155' }}>
-                  <strong>Result:</strong> {op.result}
+                  <strong>Agent response:</strong> {op.result}
                 </div>
 
                 {/* Verified Resources (if any) */}
@@ -212,4 +213,3 @@ export const AIDecisionTrace: React.FC<AIDecisionTraceProps> = ({ trace, inciden
     </div>
   );
 };
-

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from backend.database.models import CampusResourceDB
+from backend.services.departments import department_for_resource_type
+from backend.services.auth_service import hash_password
 
 MOCK_RESOURCES = [
     {
@@ -180,6 +182,7 @@ def seed_resources(db: Session) -> int:
             capacity=item.get("capacity"),
             quantity=item.get("quantity", 1),
             contact=item.get("contact"),
+            department=department_for_resource_type(item["resource_type"]),
             last_updated=datetime.now(timezone.utc),
         )
         db.add(resource)
@@ -198,18 +201,66 @@ def reset_seed_resources(db: Session):
 
 
 def seed_users(db: Session):
-    """Seeds default admin operator user if not present."""
-    import hashlib
-    from backend.database.models import UserDB
+    """Seeds the default admin, six department staff accounts, and a demo user.
+
+    All inserts are idempotent (checked by username/email) so this is safe to
+    run on every startup and never disturbs accounts a user has already created.
+    """
+    from backend.database.models import UserDB, DepartmentUserDB
+
+    # 1) Legacy privileged command-center account (Main Admin / operator).
     existing = db.query(UserDB).filter(UserDB.username == "admin").first()
     if not existing:
-        admin_user = UserDB(
+        db.add(UserDB(
             username="admin",
-            hashed_password=hashlib.sha256("password123".encode()).hexdigest(),
+            hashed_password=hash_password("password123"),
             role="operator",
-            full_name="Campus Safety Director"
-        )
-        db.add(admin_user)
+            full_name="Campus Safety Director",
+            status="active",
+        ))
         db.commit()
+
+    # 2) One staff login per department (email + password + department).
+    for email, full_name, department in DEPARTMENT_ACCOUNTS:
+        if not db.query(DepartmentUserDB).filter(DepartmentUserDB.email == email).first():
+            db.add(DepartmentUserDB(
+                email=email,
+                hashed_password=hash_password("password123"),
+                full_name=full_name,
+                department=department,
+                role="department_head",
+                status="active",
+            ))
+    db.commit()
+
+    # 3) Demo citizen account for the user portal (login = email + phone).
+    demo_email, demo_phone, demo_name = DEMO_USER
+    if not db.query(UserDB).filter(UserDB.email == demo_email).first() \
+            and not db.query(UserDB).filter(UserDB.username == demo_email).first():
+        db.add(UserDB(
+            username=demo_email,
+            email=demo_email,
+            phone=demo_phone,
+            hashed_password=hash_password(f"phone:{demo_phone}"),
+            role="user",
+            full_name=demo_name,
+            status="active",
+        ))
+        db.commit()
+
+
+# Department staff accounts: (email, full_name, DEPARTMENT_CODE). Password is
+# "password123" for all demo accounts.
+DEPARTMENT_ACCOUNTS = [
+    ("security@vignan.ac.in", "Security Control Room", "SECURITY"),
+    ("medical@vignan.ac.in", "Campus Health Centre", "MEDICAL"),
+    ("transport@vignan.ac.in", "Transport Control", "TRANSPORT"),
+    ("communication@vignan.ac.in", "Communications Desk", "COMMUNICATION"),
+    ("fire@vignan.ac.in", "Fire & Safety Post", "FIRE"),
+    ("facilities@vignan.ac.in", "Facilities Control", "FACILITIES"),
+]
+
+# Demo citizen: (email, phone, full_name)
+DEMO_USER = ("student@vignan.ac.in", "9000000000", "Demo Student")
 
 

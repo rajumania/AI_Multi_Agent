@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from backend.database.database import get_db
 from backend.services.simulation_service import simulation_service
 from backend.services.event_engine import event_engine
+from backend.api.deps import get_command_principal
+from backend.services.auth_service import Principal
 
 router = APIRouter(prefix="/api/v1/simulation", tags=["Digital Twin Simulation"])
 
@@ -41,15 +43,29 @@ def get_available_scenarios():
 
 
 @router.post("/start")
-def start_simulation(payload: StartScenarioRequest, db: Session = Depends(get_db)):
-    """Starts an autonomous digital twin emergency scenario and executes multi-agent coordination."""
+def start_simulation(
+    payload: StartScenarioRequest,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_command_principal),
+):
+    """Starts an autonomous digital twin emergency scenario and executes multi-agent coordination.
+
+    RBAC: operator/admin only (server-enforced).
+    """
     result = simulation_service.start_scenario(payload.scenario_key, db)
     return result
 
 
 @router.post("/fail-resource")
-def inject_resource_failure(payload: FailResourceRequest, db: Session = Depends(get_db)):
-    """Injects a resource breakdown failure to trigger autonomous monitoring and re-planning."""
+def inject_resource_failure(
+    payload: FailResourceRequest,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_command_principal),
+):
+    """Injects a resource breakdown failure to trigger autonomous monitoring and re-planning.
+
+    RBAC: operator/admin only (server-enforced).
+    """
     result = simulation_service.inject_resource_failure(payload.incident_id, payload.failed_resource_id, db)
     return result
 
@@ -62,8 +78,14 @@ def get_ai_decision_trace(incident_id: str):
 
 
 @router.post("/block-road")
-def block_road_segment(payload: BlockRoadRequest):
-    """Simulates a road blockage or clearance on a campus segment."""
+def block_road_segment(
+    payload: BlockRoadRequest,
+    principal: Principal = Depends(get_command_principal),
+):
+    """Simulates a road blockage or clearance on a campus segment.
+
+    RBAC: operator/admin only (server-enforced).
+    """
     from backend.services.road_network import road_network
     
     node_a = road_network.map_location_to_node(payload.node_a)

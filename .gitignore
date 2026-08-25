@@ -20,6 +20,20 @@ dist-ssr/
 
 # Environment variables
 .env
+.env.*
+!.env.example
+
+# Runtime logs and local output
+*.log
+sms_out_log.txt
+phase91-*.err
+phase91-*.out
+
+# Generated voice audio
+backend/static/voice_audio/
+
+# Mem0 runtime configuration/telemetry state
+/backend/.mem0/
 
 # IDE / Logs
 .vscode/

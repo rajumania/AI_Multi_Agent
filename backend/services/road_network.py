@@ -1,37 +1,12 @@
 import math
 from typing import Dict, List, Tuple, Set, Optional, Any
 from backend.config import settings
+from backend.services.campus_locations import CAMPUS_NODE_COORDINATES, nearest_campus_node
 
 
-
-# Coordinates for all nodes/locations
-NODES = {
-    "gate": (16.2320, 80.5490),
-    "depot": (16.2310, 80.5495),
-    "health_centre": (16.2332, 80.5502),
-    "sac": (16.2338, 80.5500),
-    "library": (16.2335, 80.5508),
-    "admin_roundabout": (16.2332, 80.5511),
-    "a_block": (16.2330, 80.5510),
-    "v_block": (16.2325, 80.5525),
-    "u_block": (16.2340, 80.5520),
-    "h_block": (16.2345, 80.5505),
-    "convocation": (16.2350, 80.5518),
-    "sports": (16.2355, 80.5495),
-    "hostels": (16.2315, 80.5535),
-    "pharmacy": (16.2348, 80.5530),
-
-    # Junctions/Waypoints
-    "depot_junc": (16.2315, 80.5495),
-    "health_junc": (16.2330, 80.5502),
-    "sports_junc": (16.2345, 80.5496),
-    "h_block_junc": (16.2342, 80.5506),
-    "convocation_junc": (16.2346, 80.5517),
-    "u_block_junc": (16.2338, 80.5518),
-    "hostel_junc": (16.2318, 80.5530),
-    "v_block_junc": (16.2328, 80.5523),
-    "pharmacy_junc": (16.2345, 80.5528),
-}
+# Backwards-compatible export used by the existing graph and tests.  The
+# coordinate source is centralized in campus_locations.py.
+NODES = dict(CAMPUS_NODE_COORDINATES)
 
 # Curved street path geometry (lists of waypoints) for each bidirectional road segment
 ROAD_GEOMETRIES = {
@@ -173,6 +148,9 @@ class RoadNetwork:
     def map_location_to_node(self, location_name: str) -> str:
         """Helper to map natural language building names to graph nodes."""
         loc = location_name.lower()
+        canonical = loc.strip().replace("-", "_").replace(" ", "_")
+        if canonical in NODES:
+            return canonical
         if "u-block" in loc or "cse" in loc or "computing" in loc or "it block" in loc:
             return "u-block"
         if "a-block" in loc or "admin" in loc or "registrar" in loc:
@@ -307,6 +285,65 @@ class RoadNetwork:
             ]
         }
 
+    def get_route_between_coordinates(
+        self,
+        origin_lat: float,
+        origin_lng: float,
+        destination_lat: float,
+        destination_lng: float,
+    ) -> Optional[Dict[str, Any]]:
+        """Route exact coordinates only when a reliable geometry source exists.
+
+        OSRM is attempted first.  If it is unavailable, the verified-in-project
+        campus graph is used only when both endpoints are close to known graph
+        nodes.  Arbitrary points are not silently connected with guessed roads.
+        """
+        origin_node = nearest_campus_node(origin_lat, origin_lng)
+        destination_node = nearest_campus_node(destination_lat, destination_lng)
+        if origin_node and destination_node:
+            path, distance = self.get_shortest_path(origin_node, destination_node)
+            if path:
+                graph_coordinates = self.get_path_coordinates(path)
+                coordinates: List[Tuple[float, float]] = [(origin_lat, origin_lng)]
+                if graph_coordinates:
+                    if graph_coordinates[0] != coordinates[0]:
+                        coordinates.extend(graph_coordinates)
+                    else:
+                        coordinates = graph_coordinates[:]
+                if coordinates[-1] != (destination_lat, destination_lng):
+                    coordinates.append((destination_lat, destination_lng))
+
+                # Include endpoint access distances while retaining the graph's
+                # road geometry. The access segments are explicitly labelled.
+                access_distance = (
+                    math.hypot(origin_lat - NODES[origin_node][0], origin_lng - NODES[origin_node][1])
+                    + math.hypot(destination_lat - NODES[destination_node][0], destination_lng - NODES[destination_node][1])
+                ) * 111000.0
+                total_distance = distance + access_distance
+                eta_seconds = int(total_distance / 10.0) if total_distance > 0 else 0
+                return {
+                    "coordinates": coordinates,
+                    "distance_meters": int(total_distance),
+                    "eta_seconds": eta_seconds,
+                    "routing_engine": "Campus Graph Engine",
+                    "source": "CAMPUS_GRAPH",
+                    "origin_node": origin_node,
+                    "destination_node": destination_node,
+                    "route": path,
+                    "steps": [{
+                        "instruction": f"Follow the existing campus road graph from {origin_node} to {destination_node}",
+                        "distance_meters": int(total_distance),
+                        "duration_seconds": eta_seconds,
+                    }],
+                }
+
+        # Outside the known campus graph, use OSRM only when it can provide
+        # actual geometry. Never use it to replace known private-campus roads.
+        osrm_result = self.fetch_osrm_route(origin_lat, origin_lng, destination_lat, destination_lng)
+        if osrm_result and len(osrm_result.get("coordinates", [])) > 1:
+            osrm_result["source"] = "OSRM"
+            return osrm_result
+        return None
+
 
 road_network = RoadNetwork()
-

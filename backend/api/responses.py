@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from backend.database.database import get_db
 from backend.services.response_service import response_service
 from backend.models.response import ResponsePlanRead, ApprovalStatus
+from backend.api.deps import get_command_principal
+from backend.services.auth_service import Principal
 
 router = APIRouter(prefix="/api/v1/response-plans", tags=["Response Plans"])
 
@@ -28,11 +30,17 @@ def serialize_plan_model(plan_db) -> Dict[str, Any]:
 
 
 @router.post("/generate/{incident_id}", response_model=ResponsePlanRead, status_code=status.HTTP_201_CREATED)
-def generate_response_plan(incident_id: str, db: Session = Depends(get_db)):
+def generate_response_plan(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_command_principal),
+):
     """
     Step 6 Response Planner Endpoint:
     Combines Incident + Agent recommendations + MCP resource discovery into a structured Response Plan.
     Enforces Human-in-the-Loop approval requirements for critical/high impact dispatch actions.
+
+    RBAC: operator/admin only (server-enforced).
     """
     plan_db = response_service.generate_plan(incident_id=incident_id, db=db)
     return serialize_plan_model(plan_db)

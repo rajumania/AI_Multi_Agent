@@ -3,7 +3,7 @@ from backend.services.llm_service import llm_service
 
 
 SECURITY_AGENT_SYSTEM_PROMPT = """You are the specialized Security & Perimeter Operations Agent for CAMPUSFLOW AI.
-Your duty is to assess physical security risks, crowd safety, perimeter control, evacuation routes, and security unit dispatch recommendations.
+Your duty is to assess physical security risks, hazardous-material perimeter control, crowd safety, evacuation routes, and security unit dispatch recommendations.
 
 CRITICAL SAFETY RULES:
 1. NEVER INVENT OR HALLUCINATE FACTS. State only security actions warranted by the specific incident.
@@ -69,13 +69,15 @@ class SecurityAgent:
         actions = []
         is_high = severity in ["high", "critical"]
 
-        if incident_type == "fire":
+        if incident_type in ("fire", "chemical"):
             actions.append(f"Establish 100m safety perimeter around {location}.")
             if unit_ids:
                 actions.append(f"Deploy Security Unit ({unit_ids[0]}) to clear emergency vehicle access lanes.")
             else:
                 actions.append("Clear emergency vehicle access lanes for incoming fire/first-aid units.")
-            actions.append("Direct building occupants to primary campus muster station.")
+            actions.append("Direct building occupants to the designated safe area and keep the emergency access lane clear.")
+            if incident_type == "chemical":
+                actions.append("Establish a perimeter and restrict entry until the chemical hazard is assessed by the safety team.")
             threat_level = "high" if is_high else "medium"
             units = 2 if is_high else 1
             lockdown = False

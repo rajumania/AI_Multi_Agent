@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   X,
@@ -8,8 +8,9 @@ import {
   Mic,
   Camera
 } from 'lucide-react';
-import { Incident } from '../types';
+import { CampusLocation, Incident } from '../types';
 import { api, CreateIncidentPayload } from '../services/api';
+import { LocationPicker, SelectedLocation } from './LocationPicker';
 
 interface ReportEmergencyModalProps {
   isOpen: boolean;
@@ -35,6 +36,14 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
   const [submittedIncident, setSubmittedIncident] = useState<Incident | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [campusLocations, setCampusLocations] = useState<CampusLocation[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<SelectedLocation | null>(null);
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    api.getCampusLocations().then(setCampusLocations).catch(() => setCampusLocations([]));
+  }, [isOpen]);
 
   const toggleVoiceInput = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -120,6 +129,7 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
         injured_count: isInjuredUnknown ? null : (injuredCount === '' ? 0 : Number(injuredCount)),
         evidence_source: evidenceSource,
         reported_by: reportedBy.trim() || 'Campus Operator',
+        ...(selectedLocation ? { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude } : {}),
       };
 
       const created = await api.createIncident(payload);
@@ -136,6 +146,8 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
     setSubmittedIncident(null);
     setDescription('');
     setLocation('');
+    setSelectedLocation(null);
+    setLocationConfirmed(false);
     setIsInjuredUnknown(true);
     setInjuredCount('');
     onClose();
@@ -403,11 +415,26 @@ export const ReportEmergencyModal: React.FC<ReportEmergencyModalProps> = ({
                   type="button"
                   key={loc}
                   className="preset-pill"
-                  onClick={() => setLocation(loc)}
+                  onClick={() => {
+                    setLocation(loc);
+                    const match = campusLocations.find((item) => item.name === loc);
+                    if (match) {
+                      setSelectedLocation({ latitude: match.latitude, longitude: match.longitude, label: match.name });
+                      setLocationConfirmed(true);
+                    }
+                  }}
                 >
                   {loc}
                 </button>
               ))}
+            </div>
+            <div style={{ marginTop: '0.8rem' }}>
+              <LocationPicker locations={campusLocations} value={selectedLocation} onChange={(value) => { setSelectedLocation(value); setLocationConfirmed(false); }} />
+              {selectedLocation && (
+                <button type="button" onClick={() => { setLocationConfirmed(true); if (selectedLocation.label) setLocation(selectedLocation.label); }} style={{ marginTop: '0.55rem', width: '100%', border: '1px solid #0284c7', borderRadius: 7, background: locationConfirmed ? '#dcfce7' : '#0284c7', color: locationConfirmed ? '#166534' : '#fff', padding: '0.5rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
+                  {locationConfirmed ? 'LOCATION CONFIRMED' : 'CONFIRM LOCATION'}
+                </button>
+              )}
             </div>
           </div>
 

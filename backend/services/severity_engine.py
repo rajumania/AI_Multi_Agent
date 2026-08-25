@@ -35,6 +35,7 @@ class SeverityEngine:
         type_scores = {
             "fire": 35,
             "explosion": 40,
+            "chemical": 40,
             "medical": 30,
             "security": 25,
             "accident": 25,
@@ -84,7 +85,7 @@ class SeverityEngine:
                 "points": casualty_pts,
                 "rationale": f"Emergency triage required for {injured_count} confirmed individual(s)."
             })
-        elif injured_count is None and any(w in desc_lower for w in ["trapped", "injured", "screaming", "unconscious", "collapse", "blood"]):
+        elif injured_count is None and any(w in desc_lower for w in ["trapped", "injured", "screaming", "unconscious", "collapse", "blood", "breathing", "respiratory"]):
             score += 15
             breakdown.append({
                 "factor": "Unverified Casualty Signals Detected",

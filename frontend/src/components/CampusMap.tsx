@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { Navigation, RefreshCw } from 'lucide-react';
-import { CampusResource, Incident } from '../types';
+import { CampusLocation, CampusResource, Incident, TransportTracking } from '../types';
 import { OperatorLocation } from './RealOperationsControls';
-import { api } from '../services/api';
+import { api, appendWsToken } from '../services/api';
 
 // Geocoding helper for Vignan University blocks
 export const getIncidentCoords = (location: string): [number, number] => {
@@ -50,6 +50,16 @@ export const getIncidentCoords = (location: string): [number, number] => {
   return [16.2334, 80.5513];
 };
 
+function resolveIncidentPosition(incident: Incident, locations: CampusLocation[]): { coords: [number, number]; source: 'EXACT' | 'CAMPUS_CATALOG' | 'APPROXIMATE' } {
+  if (incident.latitude != null && incident.longitude != null) {
+    return { coords: [incident.latitude, incident.longitude], source: 'EXACT' };
+  }
+  const text = (incident.location || '').toLowerCase();
+  const match = locations.find((item) => item.aliases.some((alias) => text.includes(alias.toLowerCase())));
+  if (match) return { coords: [match.latitude, match.longitude], source: 'CAMPUS_CATALOG' };
+  return { coords: getIncidentCoords(incident.location), source: 'APPROXIMATE' };
+}
+
 interface CampusMapProps {
   incidents: Incident[];
   onSelectIncident?: (incident: Incident) => void;
@@ -73,6 +83,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
   const routesLayerRef = useRef<L.LayerGroup | null>(null);
 
   const [resources, setResources] = useState<CampusResource[]>([]);
+  const [campusLocations, setCampusLocations] = useState<CampusLocation[]>([]);
   const [filterType, setFilterType] = useState<string>('all');
   const [mapLayer, setMapLayer] = useState<'satellite' | 'standard' | 'navigation' | 'terrain'>('satellite');
   const [loadingResources, setLoadingResources] = useState<boolean>(true);
@@ -90,8 +101,9 @@ export const CampusMap: React.FC<CampusMapProps> = ({
   const fetchResources = async () => {
     setLoadingResources(true);
     try {
-      const data = await api.getResources();
+      const [data, locations] = await Promise.all([api.getResources(), api.getCampusLocations()]);
       setResources(data);
+      setCampusLocations(locations);
     } catch (e) {
       console.error('Failed to load map resources', e);
     } finally {
@@ -102,6 +114,71 @@ export const CampusMap: React.FC<CampusMapProps> = ({
   useEffect(() => {
     fetchResources();
   }, []);
+
+  // Rehydrate persisted transport state so an operator opening or refreshing
+  // the command center still sees active assignment-bound GPS and route data.
+  // WebSocket events remain the live update path after this initial snapshot.
+  useEffect(() => {
+    let cancelled = false;
+    const activeIncidents = incidents.filter((incident) => !['resolved', 'closed'].includes(String(incident.status).toLowerCase()));
+    if (activeIncidents.length === 0) return () => { cancelled = true; };
+
+    const loadActiveTransport = async () => {
+      const snapshots: TransportTracking[] = [];
+      await Promise.all(activeIncidents.map(async (incident) => {
+        try {
+          const assignments = await api.getIncidentAssignments(incident.incident_id);
+          await Promise.all(assignments
+            .filter((assignment) => String(assignment.department).toUpperCase() === 'TRANSPORT' && ['EN_ROUTE', 'ON_SCENE'].includes(String(assignment.status).toUpperCase()))
+            .map(async (assignment) => {
+              try {
+                snapshots.push(await api.getTransportTracking(assignment.id));
+              } catch {
+                // A newly-created assignment may not have a tracking snapshot yet.
+              }
+            }));
+        } catch {
+          // The socket and normal resource feed remain available if a snapshot fails.
+        }
+      }));
+      if (cancelled) return;
+
+      setMovingVehicles((previous) => {
+        const next = { ...previous };
+        snapshots.forEach((snapshot) => {
+          if (!snapshot.resource_id || snapshot.current_latitude == null || snapshot.current_longitude == null) return;
+          next[snapshot.resource_id] = {
+            ...next[snapshot.resource_id],
+            resourceId: snapshot.resource_id,
+            latitude: snapshot.current_latitude,
+            longitude: snapshot.current_longitude,
+            status: snapshot.status,
+            etaSeconds: snapshot.eta_seconds,
+            distanceRemaining: snapshot.route?.distance_meters != null ? snapshot.route.distance_meters / 1000 : undefined,
+            source: snapshot.gps_source,
+            routeVersion: snapshot.route?.route_version,
+            timestamp: snapshot.last_gps_update,
+          };
+        });
+        return next;
+      });
+      setActiveRoutes((previous) => {
+        const next = { ...previous };
+        snapshots.forEach((snapshot) => {
+          const coordinates = snapshot.route?.coordinates;
+          if (!snapshot.resource_id || !coordinates || coordinates.length < 2) return;
+          next[snapshot.resource_id] = {
+            coordinates,
+            status: snapshot.route?.status === 'blocked' ? 'blocked' : 'active',
+          };
+        });
+        return next;
+      });
+    };
+
+    void loadActiveTransport();
+    return () => { cancelled = true; };
+  }, [incidents]);
 
   // 1. Initialize Leaflet Map
   useEffect(() => {
@@ -174,7 +251,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
   useEffect(() => {
     const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.port ? `${window.location.hostname}:8000` : window.location.host;
-    const wsUrl = `${wsProto}//${wsHost}/api/v1/events/ws`;
+    const wsUrl = appendWsToken(`${wsProto}//${wsHost}/api/v1/events/ws`);
     
     console.log(`Connecting to WebSocket: ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
@@ -184,7 +261,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
         const data = JSON.parse(event.data);
         console.log('Real-time map event:', data);
 
-        if (data.event_name === 'route_selected') {
+        if (['route_selected', 'transport_route_created', 'transport_route_updated'].includes(data.event_name)) {
           setActiveRoutes(prev => ({
             ...prev,
             [data.resource_id]: {
@@ -192,6 +269,20 @@ export const CampusMap: React.FC<CampusMapProps> = ({
               status: 'active'
             }
           }));
+          setMovingVehicles(prev => {
+            const current = prev[data.resource_id];
+            if (!current) return prev;
+            return {
+              ...prev,
+              [data.resource_id]: {
+                ...current,
+                etaSeconds: data.eta_seconds,
+                distanceRemaining: data.distance_meters != null ? data.distance_meters / 1000 : current.distanceRemaining,
+                routeVersion: data.route_version,
+                timestamp: data.timestamp,
+              },
+            };
+          });
         } else if (data.event_name === 'route_blocked') {
           setActiveRoutes(prev => {
             const current = prev[data.resource_id];
@@ -218,7 +309,22 @@ export const CampusMap: React.FC<CampusMapProps> = ({
             };
             return next;
           });
-        } else if (data.event_name === 'vehicle_location_updated') {
+        } else if (data.event_name === 'transport_eta_updated') {
+          setMovingVehicles(prev => {
+            const current = prev[data.resource_id];
+            if (!current) return prev;
+            return {
+              ...prev,
+              [data.resource_id]: {
+                ...current,
+                etaSeconds: data.eta_seconds,
+                distanceRemaining: data.distance_meters != null ? data.distance_meters / 1000 : current.distanceRemaining,
+                routeVersion: data.route_version,
+                timestamp: data.timestamp,
+              },
+            };
+          });
+        } else if (['vehicle_location_updated', 'transport_location_updated'].includes(data.event_name)) {
           // Update local resources state coords to move marker in real-time
           setResources(prev => prev.map(r => r.resource_id === data.resource_id ? {
             ...r,
@@ -236,10 +342,13 @@ export const CampusMap: React.FC<CampusMapProps> = ({
               status: data.status,
               distanceRemaining: data.distance_remaining,
               etaSeconds: data.eta_seconds,
-              routeCoordinates: data.route_coordinates
+              routeCoordinates: data.route_coordinates,
+              source: data.source || (data.event_name === 'vehicle_location_updated' ? 'SIMULATED' : 'UNAVAILABLE'),
+              routeVersion: data.route_version,
+              timestamp: data.timestamp,
             }
           }));
-        } else if (data.event_name === 'vehicle_arrived') {
+        } else if (['vehicle_arrived', 'transport_arrived'].includes(data.event_name)) {
           // Clear active routing lines and overlays
           setMovingVehicles(prev => {
             const next = { ...prev };
@@ -280,7 +389,10 @@ export const CampusMap: React.FC<CampusMapProps> = ({
 
     if (!res || !inc) return;
 
-    api.calculateRoute(res.location, inc.location)
+    const routeRequest = res.latitude != null && res.longitude != null && inc.latitude != null && inc.longitude != null
+      ? api.calculateCoordinateRoute({ origin: res.location, destination: inc.location, origin_lat: res.latitude, origin_lng: res.longitude, destination_lat: inc.latitude, destination_lng: inc.longitude })
+      : api.calculateRoute(res.location, inc.location);
+    routeRequest
       .then(data => {
         setStaticRoute({
           coordinates: data.coordinates,
@@ -302,7 +414,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
       const mv = movingVehicles[activeMvs[0]];
       const inc = incidents.find(i => i.incident_id === activeIncidentId);
       if (mv && inc) {
-        const [incLat, incLng] = getIncidentCoords(inc.location);
+        const [incLat, incLng] = resolveIncidentPosition(inc, campusLocations).coords;
         const bounds = L.latLngBounds([[mv.latitude, mv.longitude], [incLat, incLng]]);
         map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
         return;
@@ -313,7 +425,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
     if (activeIncidentId) {
       const inc = incidents.find(i => i.incident_id === activeIncidentId);
       if (inc) {
-        const [incLat, incLng] = getIncidentCoords(inc.location);
+          const [incLat, incLng] = resolveIncidentPosition(inc, campusLocations).coords;
         if (selectedResourceId) {
           const res = resources.find(r => r.resource_id === selectedResourceId);
           if (res && res.latitude && res.longitude) {
@@ -326,7 +438,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
         map.setView([incLat, incLng], 17);
       }
     }
-  }, [activeIncidentId, selectedResourceId, movingVehicles, incidents, resources]);
+  }, [activeIncidentId, selectedResourceId, movingVehicles, incidents, resources, campusLocations]);
 
   // 5. Draw Markers & Routing Layers
   useEffect(() => {
@@ -341,7 +453,8 @@ export const CampusMap: React.FC<CampusMapProps> = ({
     // A. Plot Incidents
     if (filterType === 'all' || filterType === 'incidents') {
       incidents.forEach((inc) => {
-        const [lat, lng] = getIncidentCoords(inc.location);
+        const position = resolveIncidentPosition(inc, campusLocations);
+        const [lat, lng] = position.coords;
         const isCritical = inc.severity === 'critical' || inc.severity === 'high';
         
         // Highlight active incident in view
@@ -394,6 +507,8 @@ export const CampusMap: React.FC<CampusMapProps> = ({
             <div style="font-weight: 700; font-size: 0.85rem; color: #0f172a; margin-bottom: 2px;">${inc.incident_id}</div>
             <div style="color: #dc2626; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;">${inc.incident_type} • ${inc.severity}</div>
             <div style="font-size: 0.75rem; color: #475569; margin: 4px 0;">📍 ${inc.location}</div>
+            <div style="font-size: 0.65rem; color: #64748b;">Source: ${position.source} · ${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+            <div style="font-size: 0.65rem; color: #64748b;">Reported: ${inc.created_at ? new Date(inc.created_at).toLocaleString() : 'Unavailable'}</div>
             <div style="font-size: 0.7rem; color: #0284c7; font-weight: 600;">Status: ${inc.status.toUpperCase()}</div>
           </div>
         `);
@@ -404,7 +519,20 @@ export const CampusMap: React.FC<CampusMapProps> = ({
       });
     }
 
-    // B. Plot Resources (with overlap/offset logic)
+    // B. Plot the centralized campus catalog. These are existing project
+    // coordinates and remain visibly distinguishable from exact incident GPS.
+    campusLocations.forEach((location) => {
+      L.circleMarker([location.latitude, location.longitude], {
+        radius: 5,
+        color: '#0f766e',
+        fillColor: '#99f6e4',
+        fillOpacity: 0.75,
+        weight: 1,
+      }).addTo(markersLayer)
+        .bindTooltip(`${location.name} · ${location.verification_status.split('_').join(' ')}`, { direction: 'top' });
+    });
+
+    // C. Plot Resources (with overlap/offset logic)
     const seenLocations: { [key: string]: number } = {};
 
     resources.forEach((res) => {
@@ -498,7 +626,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
         .bindTooltip(`${isReal ? 'REAL GPS' : 'DEMO GPS — SIMULATED'} • ${operatorLocation.latitude.toFixed(6)}, ${operatorLocation.longitude.toFixed(6)}`);
     }
 
-    // C. Draw Static Preview Route (if selected resource route is not yet active)
+    // D. Draw Static Preview Route (if selected resource route is not yet active)
     if (staticRoute && staticRoute.coordinates.length > 0 && Object.keys(activeRoutes).length === 0) {
       const routePoly = L.polyline(staticRoute.coordinates, {
         color: '#3b82f6',
@@ -513,7 +641,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
       drawDirectionalArrows(staticRoute.coordinates, '#3b82f6', routesLayer);
     }
 
-    // D. Draw WebSocket Active and Blocked Routes
+    // E. Draw WebSocket Active and Blocked Routes
     Object.keys(activeRoutes).forEach(rid => {
       const route = activeRoutes[rid];
       if (!route || route.coordinates.length === 0) return;
@@ -548,7 +676,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
       }
     });
 
-  }, [incidents, resources, filterType, activeIncidentId, selectedResourceId, staticRoute, activeRoutes, operatorLocation]);
+  }, [incidents, resources, campusLocations, filterType, activeIncidentId, selectedResourceId, staticRoute, activeRoutes, operatorLocation]);
 
   // Helper to draw CSS rotated arrow markers along a polyline
   const drawDirectionalArrows = (coordinates: [number, number][], color: string, layer: L.LayerGroup) => {
@@ -665,7 +793,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
 
       <div className="panel-body" style={{ padding: 0, flex: 1, position: 'relative', minHeight: '350px' }}>
         {/* Leaflet Container */}
-        <div ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: '350px', zIndex: 1 }} />
+        <div className="campus-map-canvas" ref={mapContainerRef} style={{ width: '100%', height: '100%', minHeight: '350px', zIndex: 1 }} />
 
         {/* Legend Panel overlay */}
         <div style={{
@@ -688,6 +816,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
           minWidth: '130px'
         }}>
           <strong style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '3px', fontSize: '0.72rem' }}>Map Legend</strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>BUILD <span style={{ color: '#64748b' }}>Campus Building</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🔴 <span style={{ color: '#64748b' }}>Incident</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🚑 <span style={{ color: '#64748b' }}>Ambulance</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🛡️ <span style={{ color: '#64748b' }}>Security Squad</span></div>
@@ -744,10 +873,11 @@ export const CampusMap: React.FC<CampusMapProps> = ({
                 <div><strong>Asset:</strong> <span style={{ color: '#38bdf8', fontWeight: 700 }}>{mv.resourceId}</span> {res ? `(${res.name})` : ''}</div>
                 <div><strong>Source:</strong> {res?.location || 'Campus Base'}</div>
                 <div><strong>Destination:</strong> <span style={{ color: '#fca5a5' }}>{inc?.location || 'Emergency Site'}</span></div>
-                <div><strong>ETA:</strong> <span style={{ color: '#4ade80', fontWeight: 700 }}>{Math.floor(mv.etaSeconds / 60)}m {mv.etaSeconds % 60}s</span></div>
-                <div><strong>Distance:</strong> <span style={{ color: '#fde047', fontWeight: 700 }}>{mv.distanceRemaining} km</span></div>
+                <div><strong>ETA:</strong> <span style={{ color: '#4ade80', fontWeight: 700 }}>{typeof mv.etaSeconds === 'number' ? `${Math.floor(mv.etaSeconds / 60)}m ${Math.round(mv.etaSeconds % 60)}s` : 'ETA unavailable'}</span></div>
+                <div><strong>Distance:</strong> <span style={{ color: '#fde047', fontWeight: 700 }}>{typeof mv.distanceRemaining === 'number' ? `${mv.distanceRemaining.toFixed(2)} km` : 'Unavailable'}</span></div>
                 <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed #334155', fontSize: '0.65rem', color: '#94a3b8', fontFamily: 'monospace' }}>
-                  🛰️ GPS MODE: <strong style={{ color: '#fbbf24' }}>DEMO / SIMULATED</strong>
+                  🛰️ LOCATION SOURCE: <strong style={{ color: mv.source === 'REAL' ? '#4ade80' : mv.source === 'SIMULATED' ? '#fbbf24' : '#f87171' }}>{mv.source === 'REAL' ? 'REAL GPS' : mv.source === 'SIMULATED' ? 'SIMULATED' : 'UNAVAILABLE'}</strong>
+                  {mv.timestamp && <span> · LAST UPDATE {new Date(mv.timestamp).toLocaleTimeString()}</span>}
                 </div>
               </div>
             </div>

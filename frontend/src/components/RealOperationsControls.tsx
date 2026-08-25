@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../services/api';
-import { Incident, LiveEvent } from '../types';
+import React, { useEffect, useRef, useState } from 'react';
+import { Incident } from '../types';
+import { AudioCapabilityState, isEmergencyActive, VoiceAlertState } from '../services/voiceAlertController';
 
 export interface OperatorLocation {
   latitude: number;
@@ -12,154 +12,48 @@ export interface OperatorLocation {
 
 interface RealOperationsControlsProps {
   incident?: Incident;
+  voiceIncident?: Incident | null;
+  audioState?: AudioCapabilityState;
+  voiceState?: VoiceAlertState;
+  voiceError?: string | null;
+  onEnableAudio?: () => void;
+  onMute?: () => void;
+  onUnmute?: () => void;
+  onReplay?: () => void;
+  onStopVoice?: () => void;
   wsState?: 'CONNECTED' | 'CONNECTING' | 'OFFLINE';
   demoPushVisible?: boolean;
-  onClientEvent?: (event: LiveEvent) => void;
   onGpsLocation?: (location: OperatorLocation | null) => void;
 }
 
 const DEMO_LOCATION = { latitude: 16.2334, longitude: 80.5513 };
-const DEFAULT_GPS_TOKEN = 'campusflow-secret-telemetry-key';
-
-const isEmergencyActive = (incident?: Incident) => Boolean(
-  incident && incident.status !== 'resolved' && incident.status !== 'closed'
-);
 
 export const RealOperationsControls: React.FC<RealOperationsControlsProps> = ({
   incident,
+  voiceIncident = null,
+  audioState = 'NOT_ENABLED',
+  voiceState = 'IDLE',
+  voiceError = null,
+  onEnableAudio,
+  onMute,
+  onUnmute,
+  onReplay,
+  onStopVoice,
   wsState = 'OFFLINE',
   demoPushVisible = false,
-  onClientEvent,
   onGpsLocation,
 }) => {
-  const [voiceReady, setVoiceReady] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const [stopped, setStopped] = useState(false);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [needsAudioEnable, setNeedsAudioEnable] = useState(false);
   const [gpsMode, setGpsMode] = useState<'LIVE' | 'DEMO LOCATION' | 'OFFLINE'>('OFFLINE');
   const [gpsNotice, setGpsNotice] = useState<string | null>(null);
   const [lastPosition, setLastPosition] = useState<OperatorLocation | null>(null);
 
   const watchId = useRef<number | null>(null);
   const demoTimer = useRef<number | null>(null);
-  const repeatTimer = useRef<number | null>(null);
-  const mutedRef = useRef(false);
-  const stoppedRef = useRef(false);
-
-  const emitClientEvent = useCallback((eventName: string, description: string) => {
-    const now = new Date();
-    onClientEvent?.({
-      event_name: eventName,
-      incident_id: incident?.incident_id,
-      timestamp: now.toISOString(),
-      time_display: now.toLocaleTimeString(),
-      description,
-    });
-  }, [incident?.incident_id, onClientEvent]);
-
-  useEffect(() => {
-    setVoiceReady('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window);
-  }, []);
-
-  const alertText = incident
-    ? `Emergency alert. ${incident.incident_type} reported in ${incident.location}. Campus emergency response has been activated. Security, medical and evacuation teams are being coordinated.`
-    : 'Emergency alert. Fire reported in U-Block, second floor. Campus emergency response has been activated. Security, medical and evacuation teams are being coordinated.';
-
-  const cancelSpeech = useCallback(() => {
-    if (repeatTimer.current !== null) window.clearTimeout(repeatTimer.current);
-    repeatTimer.current = null;
-    window.speechSynthesis?.cancel();
-    setSpeaking(false);
-  }, []);
-
-  const speakAlert = useCallback((force = false) => {
-    if (!voiceReady || !window.speechSynthesis) {
-      setVoiceError('Browser speech is unavailable in this browser.');
-      return;
-    }
-    if (!force && (mutedRef.current || stoppedRef.current || !isEmergencyActive(incident))) return;
-
-    setVoiceError(null);
-    setNeedsAudioEnable(false);
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(alertText);
-    utterance.rate = 0.94;
-    utterance.onstart = () => {
-      setSpeaking(true);
-      emitClientEvent('voice_alert_started', 'Browser voice emergency alert started.');
-    };
-    utterance.onend = () => {
-      setSpeaking(false);
-      if (!mutedRef.current && !stoppedRef.current && isEmergencyActive(incident)) {
-        repeatTimer.current = window.setTimeout(() => speakAlert(), 1200);
-      }
-    };
-    utterance.onerror = () => {
-      setSpeaking(false);
-      setNeedsAudioEnable(true);
-      setVoiceError('Browser autoplay or speaker access blocked. Click ENABLE AUDIO to start the real browser alert.');
-    };
-    try {
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      setNeedsAudioEnable(true);
-      setVoiceError('Click ENABLE AUDIO to allow browser speech.');
-    }
-  }, [alertText, emitClientEvent, incident, voiceReady]);
-
-  useEffect(() => {
-    stoppedRef.current = false;
-    mutedRef.current = false;
-    setStopped(false);
-    setMuted(false);
-    cancelSpeech();
-
-    if (isEmergencyActive(incident) && (incident?.severity === 'critical' || incident?.severity === 'high')) {
-      const timer = window.setTimeout(() => speakAlert(), 180);
-      return () => window.clearTimeout(timer);
-    }
-    return undefined;
-  }, [incident?.incident_id, incident?.severity, incident?.status, cancelSpeech, speakAlert]);
 
   useEffect(() => () => {
-    cancelSpeech();
     if (watchId.current !== null) navigator.geolocation?.clearWatch(watchId.current);
     if (demoTimer.current !== null) window.clearInterval(demoTimer.current);
-  }, [cancelSpeech]);
-
-  const mute = () => {
-    mutedRef.current = true;
-    setMuted(true);
-    cancelSpeech();
-    emitClientEvent('voice_alert_muted', 'Browser voice alert muted by operator.');
-  };
-
-  const replay = () => {
-    mutedRef.current = false;
-    stoppedRef.current = false;
-    setMuted(false);
-    setStopped(false);
-    speakAlert(true);
-  };
-
-  const stopAlert = () => {
-    stoppedRef.current = true;
-    mutedRef.current = false;
-    setStopped(true);
-    setMuted(false);
-    cancelSpeech();
-    emitClientEvent('voice_alert_stopped', 'Browser voice alert stopped by operator.');
-  };
-
-  const enableAudio = () => {
-    mutedRef.current = false;
-    stoppedRef.current = false;
-    setMuted(false);
-    setStopped(false);
-    speakAlert(true);
-  };
+  }, []);
 
   const publishLocation = (location: OperatorLocation) => {
     setLastPosition(location);
@@ -174,18 +68,12 @@ export const RealOperationsControls: React.FC<RealOperationsControlsProps> = ({
       return;
     }
     if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
-    watchId.current = navigator.geolocation.watchPosition(async (position) => {
-      const { latitude, longitude, accuracy, heading, speed } = position.coords;
-      const timestamp = new Date(position.timestamp || Date.now()).toISOString();
-      const location: OperatorLocation = { latitude, longitude, accuracy, timestamp, source: 'REAL' };
+    watchId.current = navigator.geolocation.watchPosition((position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      const location: OperatorLocation = { latitude, longitude, accuracy, timestamp: new Date(position.timestamp || Date.now()).toISOString(), source: 'REAL' };
       setGpsMode('LIVE');
       publishLocation(location);
-      setGpsNotice('REAL browser GPS active. Backend telemetry is attempted when available.');
-      try {
-        await api.sendTelemetry({ vehicle_id: 'RESPONDER-PHONE-001', latitude, longitude, accuracy: accuracy || 0, heading: heading || 0, speed: speed || 0, timestamp }, import.meta.env.VITE_GPS_DEVICE_TOKEN || DEFAULT_GPS_TOKEN);
-      } catch {
-        setGpsNotice('REAL browser GPS active; backend telemetry endpoint did not accept this device ping.');
-      }
+      setGpsNotice('REAL browser GPS active. Transport telemetry is sent only from an assigned Transport resource map.');
     }, (error) => {
       setGpsMode('OFFLINE');
       setGpsNotice(error.code === error.PERMISSION_DENIED
@@ -230,32 +118,47 @@ export const RealOperationsControls: React.FC<RealOperationsControlsProps> = ({
   }, [incident?.incident_id]);
 
   const active = isEmergencyActive(incident);
+  const voiceDisplayIncident = incident || voiceIncident;
+  const hasVoiceStatus = Boolean(voiceDisplayIncident) && (active || voiceState === 'STOPPED' || voiceState === 'MUTED');
+  const voiceStatusLabel = audioState === 'BLOCKED'
+    ? 'AUDIO BLOCKED'
+    : voiceState === 'STOPPED'
+      ? 'INCIDENT RESOLVED — VOICE ALERT STOPPED'
+      : voiceState === 'MUTED'
+        ? 'VOICE ALERT MUTED'
+        : voiceState === 'ACTIVE'
+          ? 'EMERGENCY VOICE ACTIVE'
+          : audioState === 'READY'
+            ? 'VOICE ALERT READY'
+            : 'VOICE ALERT WAITING FOR AUDIO';
 
   return (
     <section className="panel-card operations-panel" style={{ marginBottom: '1rem' }}>
       <div className="panel-header">
         <div className="panel-title">REAL-TIME DEVICE CAPABILITIES</div>
-        <span className="demo-label">DEMO MODE — EXTERNAL PAID SERVICES NOT REQUIRED</span>
+        <span className="panel-tag">LOCAL BROWSER CAPABILITIES • EXTERNAL PROVIDERS OPTIONAL</span>
       </div>
       <div className="panel-body" style={{ display: 'grid', gap: '0.75rem' }}>
         <div className="ops-status-grid">
-          <span className={voiceReady ? 'ops-status real' : 'ops-status offline'}>VOICE: {voiceReady ? 'BROWSER READY' : 'UNAVAILABLE'}</span>
+          <span className={`ops-status ${audioState === 'READY' ? 'real' : 'offline'}`}>AUDIO: {audioState === 'READY' ? 'READY' : audioState.replace('_', ' ')}</span>
+          {audioState !== 'READY' && <button className="btn btn-danger" onClick={onEnableAudio} disabled={audioState === 'INITIALIZING'}>{audioState === 'INITIALIZING' ? 'INITIALIZING AUDIO...' : 'ENABLE AUDIO'}</button>}
           <span className={`ops-status ${gpsMode === 'OFFLINE' ? 'offline' : gpsMode === 'DEMO LOCATION' ? 'demo' : 'real'}`}>GPS: {gpsMode}</span>
           <span className={`ops-status ${wsState === 'CONNECTED' ? 'real' : 'offline'}`}>WEBSOCKET: {wsState}</span>
-          <span className="ops-status demo">DEMO PUSH: {demoPushVisible ? 'IN APP ACTIVE' : 'READY'}</span>
+          <span className="ops-status real">IN-APP ALERT: {demoPushVisible ? 'ACTIVE' : 'READY'}</span>
         </div>
 
-        {active && (
+        {hasVoiceStatus && (
           <div className="voice-alert-strip" role="status">
             <div>
-              <strong>VOICE ALERT {stopped ? 'STOPPED' : muted ? 'MUTED' : speaking ? 'ACTIVE' : 'READY'}</strong>
+              <strong>{voiceStatusLabel}</strong>
               <small>REAL browser speaker • repeats while this emergency is active</small>
             </div>
             <div className="quick-actions-group">
-              {needsAudioEnable && <button className="btn btn-danger" onClick={enableAudio}>CLICK TO ENABLE AUDIO</button>}
-              <button className="btn btn-outline" onClick={mute} disabled={muted || stopped}>MUTE</button>
-              <button className="btn btn-outline" onClick={replay}>REPLAY</button>
-              <button className="btn btn-danger" onClick={stopAlert}>STOP ALERT</button>
+              {audioState !== 'READY' && <button className="btn btn-danger" onClick={onEnableAudio} disabled={audioState === 'INITIALIZING'}>ENABLE AUDIO</button>}
+              {active && voiceState !== 'MUTED' && <button className="btn btn-outline" onClick={onMute}>MUTE</button>}
+              {active && voiceState === 'MUTED' && <button className="btn btn-outline" onClick={onUnmute}>UNMUTE</button>}
+              {active && <button className="btn btn-outline" onClick={onReplay}>REPLAY</button>}
+              {active && <button className="btn btn-danger" onClick={onStopVoice}>STOP ALERT</button>}
             </div>
           </div>
         )}

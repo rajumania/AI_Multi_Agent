@@ -17,6 +17,7 @@ import { RecentActivityPlaceholder } from '../components/RecentActivityPlacehold
 import { ResourceBreakdownWidget } from '../components/ResourceBreakdownWidget';
 import { SimulationControls } from '../components/SimulationControls';
 import { OperatorLocation, RealOperationsControls } from '../components/RealOperationsControls';
+import { AudioCapabilityState, VoiceAlertState } from '../services/voiceAlertController';
 
 
 interface DashboardProps {
@@ -35,8 +36,16 @@ interface DashboardProps {
   workflowError?: string | null;
   demoPushVisible?: boolean;
   wsState?: 'CONNECTED' | 'CONNECTING' | 'OFFLINE';
+  audioState?: AudioCapabilityState;
+  voiceState?: VoiceAlertState;
+  voiceIncident?: Incident | null;
+  voiceError?: string | null;
+  onEnableAudio?: () => void;
+  onMute?: () => void;
+  onUnmute?: () => void;
+  onReplay?: () => void;
+  onStopVoice?: () => void;
   operatorLocation?: OperatorLocation | null;
-  onClientEvent?: (event: LiveEvent) => void;
   onGpsLocation?: (location: OperatorLocation | null) => void;
   onResolveIncident?: (incident: Incident) => void;
   onViewResponsePlan?: () => void;
@@ -63,10 +72,10 @@ const timelineLabel = (eventName: string) => {
     resource_dispatched: 'Responder/resource assigned',
     vehicle_location_updated: 'Responder location updated',
     voice_alert_started: 'Voice emergency alert started',
-    demo_push_available: 'Demo push notification displayed',
-    demo_push_displayed: 'Demo push notification displayed',
+    in_app_alert_available: 'In-app emergency alert displayed',
+    in_app_alert_displayed: 'In-app emergency alert displayed',
     voice_alert_muted: 'Voice alert muted by operator',
-    voice_alert_stopped: 'Voice alert stopped by operator',
+    voice_alert_stopped: 'Voice alert stopped',
     incident_resolved: 'Incident resolved',
   };
   return labels[eventName] || eventName.split('_').join(' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase());
@@ -88,8 +97,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
   workflowError,
   demoPushVisible = false,
   wsState = 'OFFLINE',
+  audioState = 'NOT_ENABLED',
+  voiceState = 'IDLE',
+  voiceIncident = null,
+  voiceError = null,
+  onEnableAudio,
+  onMute,
+  onUnmute,
+  onReplay,
+  onStopVoice,
   operatorLocation,
-  onClientEvent,
   onGpsLocation,
   onResolveIncident,
   onViewResponsePlan,
@@ -112,7 +129,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
           }
         }}
       />
-      <RealOperationsControls incident={activeIncident || activeIncidents[0]} wsState={wsState} demoPushVisible={demoPushVisible} onClientEvent={onClientEvent} onGpsLocation={onGpsLocation} />
+      <RealOperationsControls
+        incident={activeIncident || activeIncidents[0]}
+        voiceIncident={voiceIncident}
+        audioState={audioState}
+        voiceState={voiceState}
+        voiceError={voiceError}
+        wsState={wsState}
+        demoPushVisible={demoPushVisible}
+        onEnableAudio={onEnableAudio}
+        onMute={onMute}
+        onUnmute={onUnmute}
+        onReplay={onReplay}
+        onStopVoice={onStopVoice}
+        onGpsLocation={onGpsLocation}
+      />
 
       {activeIncident && (
         <div className="command-center-grid">
@@ -120,11 +151,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="active-emergency-heading"><span className="live-pulse-dot" /> ACTIVE EMERGENCY <span className="workflow-chip">{workflowStatus}</span></div>
             <div className="active-emergency-body">
               <div><small>INCIDENT</small><strong>{activeIncident.incident_type.toUpperCase()} — {activeIncident.location}</strong><span>{activeIncident.description}</span></div>
-              <div className="emergency-facts"><div><small>SEVERITY</small><strong>{activeIncident.severity.toUpperCase()}</strong></div><div><small>STATUS</small><strong>RESPONSE IN PROGRESS</strong></div><div><small>AI ASSESSMENT</small><strong>{activeIncident.summary ? 'COMPLETED' : 'PROCESSING'}</strong></div><div><small>RESPONSE PLAN</small><strong>{responsePlan ? 'ACTIVE' : 'PROCESSING'}</strong></div><div><small>RESPONDERS</small><strong>{assignedResources.length || 'COORDINATING'}</strong></div><div><small>NOTIFICATIONS</small><strong>{demoPushVisible ? 'IN-APP DEMO' : 'STAGING'}</strong></div></div>
+              <div className="emergency-facts"><div><small>SEVERITY</small><strong>{activeIncident.severity.toUpperCase()}</strong></div><div><small>STATUS</small><strong>RESPONSE IN PROGRESS</strong></div><div><small>AI ASSESSMENT</small><strong>{activeIncident.summary ? 'COMPLETED' : 'PROCESSING'}</strong></div><div><small>RESPONSE PLAN</small><strong>{responsePlan ? 'ACTIVE' : 'PROCESSING'}</strong></div><div><small>RESPONDERS</small><strong>{assignedResources.length || 'COORDINATING'}</strong></div><div><small>NOTIFICATIONS</small><strong>{demoPushVisible ? 'IN-APP ACTIVE' : 'OPTIONAL CHANNELS'}</strong></div></div>
               <div className="emergency-actions"><button className="btn btn-outline" onClick={onViewResponsePlan}>VIEW RESPONSE PLAN</button><button className="btn btn-outline" onClick={() => document.querySelector('.map-command-panel')?.scrollIntoView({ behavior: 'smooth' })}>VIEW MAP</button><button className="btn btn-danger" onClick={() => onResolveIncident?.(activeIncident)}>RESOLVE INCIDENT</button></div>
             </div>
           </section>
-          {demoPushVisible && <section className="demo-push-card"><div className="demo-push-label">DEMO PUSH — IN APP</div><h3>CAMPUS EMERGENCY ALERT</h3><strong>{activeIncident.incident_type.toUpperCase()} reported:</strong><p>{activeIncident.location}</p><p>Response teams activated.</p><small>Recipients: Security Team • Medical Team • Evacuation Team</small><em>No external mobile push delivery claimed.</em></section>}
+          {demoPushVisible && <section className="demo-push-card"><div className="demo-push-label">IN-APP ALERT — LOCAL CHANNEL</div><h3>CAMPUS EMERGENCY ALERT</h3><strong>{activeIncident.incident_type.toUpperCase()} reported:</strong><p>{activeIncident.location}</p><p>Response teams activated.</p><small>Recipients: Security Team • Medical Team • Evacuation Team</small><em>No external mobile push delivery claimed.</em></section>}
         </div>
       )}
       {workflowError && <div className="alert-banner error" role="alert">{workflowError}</div>}

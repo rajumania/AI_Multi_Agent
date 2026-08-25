@@ -30,10 +30,19 @@ def test_login_invalid_credentials_fails(client):
     assert "Invalid username or password" in res.json()["detail"]
 
 def test_signup_and_login_flow_success(client):
-    """Test registering a new user and logging in with the new account."""
+    """Anonymous signup + login round-trip works, but a requested privileged
+    role is clamped to a plain citizen ("user").
+
+    Increment 1 closes the previous privilege-escalation hole where an
+    unauthenticated caller could self-assign "operator" via /signup. Only an
+    authenticated admin/operator may mint privileged or department accounts now
+    (see the clamp in backend/api/auth.py:signup and backend/api/auth.py:
+    department_register). This test was updated from asserting role=="operator"
+    to role=="user" to reflect that required security fix.
+    """
     import uuid
     test_uname = f"op_test_{uuid.uuid4().hex[:6]}"
-    # Signup new operator
+    # Signup requesting "operator" — the server must silently downgrade to "user".
     signup_res = client.post("/api/v1/auth/signup", json={
         "username": test_uname,
         "password": "password123",
@@ -42,8 +51,9 @@ def test_signup_and_login_flow_success(client):
     })
     assert signup_res.status_code == 200
     assert signup_res.json()["username"] == test_uname
+    assert signup_res.json()["role"] == "user"  # privilege-escalation clamp
 
-    # Login with newly created credentials
+    # Login with newly created credentials still works.
     login_res = client.post("/api/v1/auth/login", json={
         "username": test_uname,
         "password": "password123"
@@ -52,7 +62,7 @@ def test_signup_and_login_flow_success(client):
     data = login_res.json()
     assert "token" in data
     assert data["user"]["username"] == test_uname
-    assert data["user"]["role"] == "operator"
+    assert data["user"]["role"] == "user"  # clamped server-side, not "operator"
 
 def test_signup_duplicate_username_fails(client):
     """Test that signup fails if the username is already registered."""

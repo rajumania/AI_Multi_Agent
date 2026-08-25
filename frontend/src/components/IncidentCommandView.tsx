@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -7,8 +7,6 @@ import {
   ShieldCheck,
   Send,
   XCircle,
-  FileCheck,
-  Sparkles,
   ShieldAlert,
   CheckCheck,
   RefreshCw,
@@ -21,6 +19,8 @@ import {
   SeverityLevel,
   IncidentStatus,
   ResponsePlan,
+  DepartmentAssignment,
+  LiveEvent,
 } from '../types';
 import { api } from '../services/api';
 import { AIDecisionTrace } from './AIDecisionTrace';
@@ -31,12 +31,14 @@ interface IncidentCommandViewProps {
   incident: Incident;
   onClose: () => void;
   onRefresh: () => void;
+  liveEvents: LiveEvent[];
 }
 
 export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
   incident,
   onClose,
-  onRefresh
+  onRefresh,
+  liveEvents,
 }) => {
   const [viewRole, setViewRole] = useState<'operator' | 'student'>('operator');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -52,11 +54,13 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [allResources, setAllResources] = useState<any[]>([]);
   const [decisionTrace, setDecisionTrace] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<DepartmentAssignment[]>([]);
   const [loadingData, setLoadingData] = useState<boolean>(true);
 
   // WebSocket live tracking states
   const [selectedResourceId, setSelectedResourceId] = useState<string | undefined>(undefined);
   const [liveTelemetry, setLiveTelemetry] = useState<any>(null);
+  const lastHandledEvent = useRef<string | null>(null);
 
   useEffect(() => {
     if (responsePlan && responsePlan.allocated_resources && responsePlan.allocated_resources.length > 0) {
@@ -74,47 +78,15 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
     }
   }, [responsePlan]);
 
-  useEffect(() => {
-    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.port ? `${window.location.hostname}:8000` : window.location.host;
-    const wsUrl = `${wsProto}//${wsHost}/api/v1/events/ws`;
-    const ws = new WebSocket(wsUrl);
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (!data.incident_id || data.incident_id === incident.incident_id || data.incident_id === 'SYSTEM') {
-          if (data.event_name === 'vehicle_location_updated') {
-            setLiveTelemetry(data);
-          } else if (data.event_name === 'vehicle_arrived') {
-            setLiveTelemetry(null);
-            fetchIncidentDetails();
-          } else if (data.event_name === 'trace_updated' && data.entry) {
-            setDecisionTrace((prev) => {
-              // Avoid duplicates
-              const exists = prev.some(t => t.timestamp === data.entry.timestamp && t.agent === data.entry.agent && t.action === data.entry.action);
-              return exists ? prev : [...prev, data.entry];
-            });
-          } else if (['route_blocked', 'route_recalculated', 'approval_granted', 'approval_rejected', 'resource_dispatched', 'response_status_changed', 'replan_completed', 'incident_resolved'].includes(data.event_name)) {
-            fetchIncidentDetails();
-          }
-        }
-      } catch (e) {
-        console.error('Error on IncidentCommandView WS message', e);
-      }
-    };
-
-    return () => ws.close();
-  }, [incident.incident_id]);
-
   const fetchIncidentDetails = async () => {
     setLoadingData(true);
     try {
-      const [plans, logs, resources, traceRes] = await Promise.all([
+      const [plans, logs, resources, traceRes, assignmentsRes] = await Promise.all([
         api.getResponsePlans(incident.incident_id).catch(() => []),
         api.getActivityLogs(incident.incident_id).catch(() => []),
         api.getResources().catch(() => []),
-        api.getDecisionTrace(incident.incident_id).catch(() => ({ trace: [] }))
+        api.getDecisionTrace(incident.incident_id).catch(() => ({ trace: [] })),
+        api.getIncidentAssignments(incident.incident_id).catch(() => [])
       ]);
       setDecisionTrace(traceRes?.trace || []);
 
@@ -123,6 +95,7 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
       }
       setActivityLogs(logs);
       setAllResources(resources);
+      setAssignments(assignmentsRes);
     } catch (e: any) {
       console.error('Failed to load incident detail data', e);
     } finally {
@@ -133,6 +106,29 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
   useEffect(() => {
     fetchIncidentDetails();
   }, [incident.incident_id]);
+
+  // IncidentCommandView consumes the App-owned event stream. This keeps the
+  // command center on one authenticated WebSocket while assignment state is
+  // re-read from the backend after each real department event.
+  useEffect(() => {
+    // Assignment events must be correlated to this exact incident. A prior
+    // implementation treated an unrelated/system event without incident_id
+    // as a match; because the timeline is newest-first, that could prevent a
+    // later department event from refreshing the command-center snapshot.
+    const event = liveEvents.find((item) => item.incident_id === incident.incident_id);
+    if (!event) return;
+    const eventKey = `${event.event_name}:${event.timestamp}:${event.assignment_id || ''}:${event.department || ''}:${event.status || ''}`;
+    if (lastHandledEvent.current === eventKey) return;
+    lastHandledEvent.current = eventKey;
+    if (['vehicle_location_updated', 'transport_location_updated', 'transport_eta_updated'].includes(event.event_name)) setLiveTelemetry(event);
+    if (['vehicle_arrived', 'transport_arrived'].includes(event.event_name)) setLiveTelemetry(null);
+    if (event.event_name === 'trace_updated' && event.entry) {
+      setDecisionTrace((previous) => previous.some((entry) => entry.timestamp === event.entry.timestamp && entry.agent === event.entry.agent && entry.action === event.entry.action) ? previous : [...previous, event.entry]);
+    }
+    if (['assessment_started', 'incident_assessed', 'assessment_failed', 'incident_updated', 'response_plan_updated', 'response_plan_generated', 'awaiting_human_authorization', 'route_blocked', 'route_recalculated', 'approval_granted', 'approval_approved', 'approval_rejected', 'resource_dispatched', 'response_status_changed', 'replan_completed', 'incident_resolved', 'department_notified', 'dept_assignment_accepted', 'dept_assignment_declined', 'dept_team_assigned', 'dept_en_route', 'dept_on_scene', 'dept_assignment_completed'].includes(event.event_name)) {
+      void fetchIncidentDetails();
+    }
+  }, [incident.incident_id, incident.status, liveEvents]);
 
   // Operational Action Handlers
   const handleSimulateBlockage = async () => {
@@ -160,37 +156,6 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
       fetchIncidentDetails();
     } catch (e: any) {
       setActionError(e.message || 'Block road simulation failed');
-    } finally {
-      setLoadingAction(null);
-    }
-  };
-
-  const handleAssessIncident = async () => {
-    setLoadingAction('assess');
-    setActionError(null);
-    try {
-      await api.analyzeIncident(incident.incident_id);
-      setActionSuccess('Incident assessed and categorized successfully.');
-      onRefresh();
-      fetchIncidentDetails();
-    } catch (e: any) {
-      setActionError(e.message || 'Assessment failed');
-    } finally {
-      setLoadingAction(null);
-    }
-  };
-
-  const handlePreparePlan = async () => {
-    setLoadingAction('plan');
-    setActionError(null);
-    try {
-      const plan = await api.generateResponsePlan(incident.incident_id);
-      setResponsePlan(plan);
-      setActionSuccess('Recommended response plan prepared. Awaiting authorization.');
-      onRefresh();
-      fetchIncidentDetails();
-    } catch (e: any) {
-      setActionError(e.message || 'Response plan preparation failed');
     } finally {
       setLoadingAction(null);
     }
@@ -282,7 +247,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
     setActionError(null);
     try {
       await api.executeDispatch(responsePlan.plan_id);
-      setActionSuccess('Emergency response initiated. Response teams dispatched and the in-app demo alert is active. Optional provider results remain explicitly labeled.');
+      setActionSuccess('Emergency response initiated. Response teams dispatched and the in-app alert is active. Optional provider results remain explicitly labeled.');
       onRefresh();
       fetchIncidentDetails();
     } catch (e: any) {
@@ -409,7 +374,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
     { title: 'Response Planned', desc: 'Resource check & plan prepared' },
     { title: 'Authorization', desc: 'Commander review & approval' },
     { title: 'Authorized', desc: 'Response approved for deployment' },
-    { title: 'Response in Progress', desc: 'Teams deployed & in-app demo alert active' },
+    { title: 'Response in Progress', desc: 'Teams deployed & in-app alert active' },
     { title: 'Monitoring', desc: 'On-scene response confirmed' },
     { title: 'Incident Resolved', desc: 'Situation confirmed under control' },
     { title: 'Incident Closed', desc: 'Record administratively finalized' }
@@ -436,7 +401,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
       return `Response plan has been authorized by the safety commander. Ready to initiate physical team dispatch and campus broadcast alerts.`;
     }
     if (incident.status === 'in_progress' || incident.status === 'response_in_progress' || incident.status === 'dispatched') {
-      return `Emergency response is actively in progress. Dispatched units are responding to ${incident.location}; the browser voice and in-app demo alert are active.`;
+      return `Emergency response is actively in progress. Dispatched units are responding to ${incident.location}; the browser voice and in-app alert are active.`;
     }
     if (incident.status === 'monitoring') {
       return `Response teams have arrived on-scene at ${incident.location} and confirmed active containment. Responders are working to bring the situation fully under control.`;
@@ -518,7 +483,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
           title: '⚠️ General Campus Emergency Guidance',
           steps: [
             'Remain calm and stay clear of the affected incident zone.',
-            'Follow the browser voice and in-app demo alert. SMS and other external channels are optional integrations.',
+            'Follow the browser voice and in-app alert. SMS and other external channels are optional integrations.',
             'Report any secondary hazards or trapped individuals immediately.'
           ]
         };
@@ -531,14 +496,14 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="modal-card"
+        className="modal-card incident-command-modal"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '980px', width: '95vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
       >
         {/* Top Command Bar */}
         <div className="modal-header" style={{ borderBottom: '1px solid #e2e8f0', padding: '1rem 1.25rem', background: '#f8fafc' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{
+            <div className="incident-lifecycle-grid" style={{
               background: '#0284c7',
               color: '#ffffff',
               padding: '0.45rem',
@@ -561,6 +526,9 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
               </div>
               <div style={{ fontSize: '0.78125rem', color: '#64748b', marginTop: '0.15rem' }}>
                 📍 {incident.location} • Reported {new Date(incident.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Vignan University (Vadlamudi)
+              </div>
+              <div style={{ fontSize: '0.72rem', marginTop: '0.35rem', color: incident.ai_provider_status === 'FALLBACK_ACTIVE' ? '#b45309' : '#0369a1', fontWeight: 700 }}>
+                AI PROVIDER: {incident.ai_provider_status || 'PENDING'}
               </div>
             </div>
           </div>
@@ -720,7 +688,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
           {/* 2. THE 3 CORE OPERATIONAL CARDS */}
           {/* (What is happening now / What happened so far / What happens next) */}
           {/* ============================================================ */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.85rem' }}>
+          <div className="incident-core-cards" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.85rem' }}>
             {/* What is Happening Now */}
             <div style={{
               background: '#f0f9ff',
@@ -758,7 +726,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                 {currentIndex >= 2 && <div>✓ Available response resources identified</div>}
                 {currentIndex >= 3 && <div>✓ Recommended response plan formulated</div>}
                 {currentIndex >= 4 && <div>✓ Response authorized by safety commander</div>}
-                {currentIndex >= 5 && <div>✓ Units dispatched & in-app demo alert displayed</div>}
+                {currentIndex >= 5 && <div>✓ Units dispatched & in-app alert displayed</div>}
                 {currentIndex >= 6 && <div>✓ Response team arrival confirmed on-scene</div>}
                 {currentIndex >= 7 && <div>✓ Situation confirmed under control & resolved</div>}
                 {currentIndex >= 8 && <div>✓ Incident closed and archived</div>}
@@ -800,7 +768,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
               "{incident.description}"
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
+            <div className="incident-meta-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
               <div className="meta-card">
                 <div className="meta-title">Campus Location</div>
                 <div className="meta-value" style={{ fontSize: '0.8125rem', color: '#0284c7', fontWeight: 600 }}>
@@ -843,6 +811,10 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                 explanation={incident.summary}
               />
             </div>
+            <div style={{ marginTop: '0.75rem', padding: '0.65rem 0.75rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '7px', fontSize: '0.75rem', color: '#1e3a8a' }}>
+              <strong>AI-required departments: </strong>
+              {(incident.required_departments || []).length > 0 ? incident.required_departments?.join(' • ') : 'Awaiting AI routing assessment'}
+            </div>
           </div>
 
           {/* Live AI Agent Decision Trace Component */}
@@ -850,6 +822,23 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
             trace={decisionTrace}
             incidentId={incident.incident_id}
           />
+
+          <section style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '1rem', color: '#e2e8f0' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.05em', marginBottom: '0.7rem' }}>DEPARTMENT RESPONSES</div>
+            {assignments.length === 0 ? (
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>No department assignments yet. They appear after an approved plan is dispatched.</div>
+            ) : (
+              <div style={{ display: 'grid', gap: '0.55rem' }}>
+                {assignments.map((assignment) => (
+                  <div key={assignment.id} className="incident-assignment-row" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 1.5fr', gap: '0.5rem', alignItems: 'center', padding: '0.55rem 0.65rem', border: '1px solid #334155', borderRadius: '6px', background: '#111c31' }}>
+                    <strong style={{ fontSize: '0.72rem' }}>{assignment.department}</strong>
+                    <span style={{ color: assignment.status === 'DECLINED' ? '#f87171' : assignment.status === 'COMPLETED' ? '#4ade80' : '#38bdf8', fontSize: '0.7rem', fontWeight: 800 }}>{assignment.status}</span>
+                    <span style={{ color: '#cbd5e1', fontSize: '0.68rem' }}>{assignment.assigned_resources.length ? assignment.assigned_resources.join(', ') : (assignment.message || 'No team assigned')} · {new Date(assignment.updated_at).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
           {/* ============================================================ */}
           {/* 4. RECOMMENDED RESPONSE PLAN & PHYSICAL RESOURCES */}
@@ -1007,40 +996,13 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                 <span>Command Actions & Operational Authorization</span>
               </div>
 
-              {/* Stage 1: Assessment needed */}
-              {(incident.status === 'reported' || incident.status === 'analyzing') && (
-                <div>
-                  <p style={{ fontSize: '0.8125rem', color: '#334155', marginBottom: '0.75rem' }}>
-                    Emergency report is logged. Click below to execute the intake assessment and classify the incident.
-                  </p>
-                  <button
-                    className="btn btn-primary"
-                    style={{ width: '100%', padding: '0.6rem' }}
-                    onClick={handleAssessIncident}
-                    disabled={loadingAction === 'assess'}
-                  >
-                    <Sparkles size={15} />
-                    <span>{loadingAction === 'assess' ? 'Evaluating Incident...' : 'Execute Intake Assessment'}</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Stage 2: Classification complete, prepare plan */}
-              {incident.status === 'classified' && !responsePlan && (
-                <div>
-                  <p style={{ fontSize: '0.8125rem', color: '#334155', marginBottom: '0.75rem' }}>
-                    Incident classified as {(incident.severity || 'unknown').toUpperCase()} {(incident.incident_type || 'unknown').toUpperCase()}. Check resource availability and prepare response plan.
-                  </p>
-                  <button
-                    className="btn btn-primary"
-                    style={{ width: '100%', padding: '0.6rem', background: '#0284c7' }}
-                    onClick={handlePreparePlan}
-                    disabled={loadingAction === 'plan'}
-                  >
-                    <FileCheck size={15} />
-                    <span>{loadingAction === 'plan' ? 'Verifying Resources & Formulating Plan...' : 'Formulate Emergency Response Plan'}</span>
-                  </button>
-                </div>
+              {/* The report, assessment, and plan stages are automatic after
+                  submission. This view only exposes the human authorization
+                  decision once a real plan is ready. */}
+              {(incident.status === 'reported' || incident.status === 'analyzing' || incident.status === 'classified' || incident.status === 'response_planning') && !responsePlan && (
+                <p style={{ fontSize: '0.8125rem', color: '#334155', margin: 0 }}>
+                  AI assessment and response-plan preparation are in progress. Operator authorization will appear when the plan is ready.
+                </p>
               )}
 
               {/* Stage 3: Awaiting Commander Approval */}
@@ -1137,7 +1099,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem' }}>
                         <div style={{ background: '#f8fafc', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.7rem' }}>
-                          <span style={{ color: '#b45309', fontWeight: 700 }}>• DEMO PUSH — IN APP</span>
+                          <span style={{ color: '#b45309', fontWeight: 700 }}>• IN-APP ALERT — LOCAL</span>
                           <div style={{ color: '#64748b', fontSize: '0.65rem' }}>Status: DISPLAYED IN THIS COMMAND CENTER</div>
                         </div>
                         <div style={{ background: '#f8fafc', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.7rem' }}>

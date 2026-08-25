@@ -11,6 +11,8 @@ from backend.models.response import ResponsePlanRead, ApprovalStatus
 from backend.graph.workflow import run_emergency_workflow
 from backend.services.audit_service import audit_service
 from backend.services.event_engine import event_engine
+from backend.services.performance import perf_stage
+from backend.services.workflow_cache import workflow_cache
 
 
 def generate_plan_id() -> str:
@@ -51,7 +53,16 @@ class ResponseService:
             "summary": incident.summary or "",
             "audit_trail": []
         }
-        graph_state = run_emergency_workflow(initial_state)
+        with perf_stage("response_plan", incident_id=incident_id):
+            graph_state = workflow_cache.take_graph(incident_id, initial_state)
+            if graph_state is None:
+                cached_analysis = workflow_cache.take_supervisor(
+                    incident_id,
+                    {"description": incident.description, "reported_by": incident.reported_by},
+                )
+                if cached_analysis:
+                    initial_state["supervisor_analysis"] = cached_analysis
+                graph_state = run_emergency_workflow(initial_state)
 
         # 3. Consolidate Recommendations and MCP Resources
         recommended_actions = graph_state.get("all_recommendations", [])
@@ -87,8 +98,9 @@ class ResponseService:
         incident.current_step = "Recommended response plan prepared. Awaiting commander authorization."
         incident.next_action = "Authorized operator must review recommended response and authorize dispatch."
         incident.updated_at = now
-        db.commit()
-        db.refresh(plan_db)
+        with perf_stage("response_plan_persistence", incident_id=incident_id):
+            db.commit()
+            db.refresh(plan_db)
 
         # 4. Audit Logging
         audit_service.log(
@@ -116,18 +128,55 @@ class ResponseService:
                 db=db
             )
 
-        event_engine.publish_event(
-            event_name="response_plan_generated",
-            incident_id=incident.incident_id,
-            payload={
-                "event_name": "response_plan_generated",
-                "plan_id": plan_id,
-                "description": f"Response plan generated with {len(allocated_resource_ids)} assigned resource(s).",
-                "allocated_resources": allocated_resource_ids,
-                "approval_status": plan_db.approval_status,
-            },
-            db=db,
-        )
+        with perf_stage("websocket_publish", incident_id=incident_id):
+            event_engine.publish_event(
+                event_name="response_plan_generated",
+                incident_id=incident.incident_id,
+                payload={
+                    "event_name": "response_plan_generated",
+                    "plan_id": plan_id,
+                    "status": incident.status,
+                    "description": f"Response plan generated with {len(allocated_resource_ids)} assigned resource(s).",
+                    "allocated_resources": allocated_resource_ids,
+                    "approval_status": plan_db.approval_status,
+                },
+                db=db,
+            )
+
+        # Real "pause for human approval" signal for the live command center.
+        # Broadcast-only (db=None): the audit trail already records
+        # 'approval_requested' above; this is the additive real-time event the
+        # frontend uses to move the workflow into its WAITING_APPROVAL state.
+        if requires_approval:
+            event_engine.publish_event(
+                event_name="approval_required",
+                incident_id=incident.incident_id,
+                payload={
+                    "event_name": "approval_required",
+                    "event": "approval_required",
+                    "plan_id": plan_id,
+                    "status": "waiting_approval",
+                    "message": "Human operator approval required before dispatch.",
+                    "description": f"Response plan for {incident.location} requires human authorization before dispatch.",
+                    "severity": incident.severity,
+                    "required_approvals": required_approvals,
+                    "approval_status": plan_db.approval_status,
+                },
+                db=None,
+            )
+            event_engine.publish_event(
+                event_name="awaiting_human_authorization",
+                incident_id=incident.incident_id,
+                payload={
+                    "event_name": "awaiting_human_authorization",
+                    "event": "awaiting_human_authorization",
+                    "plan_id": plan_id,
+                    "status": incident.status,
+                    "approval_status": plan_db.approval_status,
+                    "message": "Response plan is ready for explicit human authorization.",
+                },
+                db=None,
+            )
 
         return plan_db
 
@@ -203,6 +252,27 @@ class ResponseService:
             },
             db=db,
         )
+
+        # Additive canonical event for the live command center. The existing
+        # 'approval_granted' event (with its audit row) is preserved above for
+        # current consumers/tests; 'approval_approved' is broadcast-only (db=None)
+        # and matches the frontend contract used by the 3D workflow. Rejections
+        # already emit the canonical 'approval_rejected' above.
+        if is_approved:
+            event_engine.publish_event(
+                event_name="approval_approved",
+                incident_id=plan.incident_id,
+                payload={
+                    "event_name": "approval_approved",
+                    "event": "approval_approved",
+                    "plan_id": plan.plan_id,
+                    "status": "approved",
+                    "message": f"Response plan approved by {operator_name}.",
+                    "approval_status": new_status,
+                    "approved_by": operator_name,
+                },
+                db=None,
+            )
 
         return plan
 

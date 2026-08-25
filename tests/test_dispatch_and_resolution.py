@@ -5,6 +5,7 @@ from backend.main import app
 
 from backend.database.database import SessionLocal
 from backend.database.seed import reset_seed_resources
+from backend.api import incidents as incidents_api
 
 
 @pytest.fixture
@@ -132,3 +133,34 @@ def test_resolve_incident_releases_resources(client):
     action_types = [l["action_type"] for l in logs]
     assert "automation_execution" in action_types
     assert "incident_resolved" in action_types
+
+
+def test_close_incident_publishes_closed_event(client, monkeypatch):
+    """Administrative closure must reach the existing WebSocket event path."""
+    create_res = client.post("/api/v1/incidents", json={
+        "description": "Power restored after a facility interruption.",
+        "location": "A-Block",
+        "incident_type": "facility",
+        "severity": "low",
+        "injured_count": 0,
+    })
+    incident_id = create_res.json()["incident_id"]
+    events = []
+
+    original_publish = incidents_api.event_engine.publish_event
+
+    def capture_event(event_name, incident_id, payload, db=None):
+        events.append((event_name, incident_id, payload))
+        return original_publish(event_name, incident_id, payload, db=db)
+
+    monkeypatch.setattr(incidents_api.event_engine, "publish_event", capture_event)
+    close_res = client.post(f"/api/v1/incidents/{incident_id}/close", json={
+        "closing_notes": "Administrative closure after verification.",
+        "closed_by": "Campus Operator",
+    })
+
+    assert close_res.status_code == 200
+    assert any(
+        name == "incident_closed" and event_id == incident_id and payload["status"] == "closed"
+        for name, event_id, payload in events
+    )

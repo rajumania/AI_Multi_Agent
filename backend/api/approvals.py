@@ -5,6 +5,8 @@ from backend.database.database import get_db
 from backend.services.response_service import response_service
 from backend.models.response import ResponsePlanRead, ApprovalDecisionPayload
 from backend.api.responses import serialize_plan_model
+from backend.api.deps import get_command_principal
+from backend.services.auth_service import Principal
 
 router = APIRouter(prefix="/api/v1/approvals", tags=["Approvals"])
 
@@ -22,17 +24,23 @@ def get_pending_approvals(db: Session = Depends(get_db)):
 def decide_approval(
     plan_id: str,
     payload: ApprovalDecisionPayload,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_command_principal),
 ):
     """
     Step 6 Human-in-the-Loop Approval Decision:
     Allows authorized operator/commander to Approve or Reject high-impact response plans.
     Maintains complete audit logging of who approved the plan and why.
+
+    RBAC: requires an operator/admin principal (enforced server-side). The
+    approver recorded in the audit trail is the authenticated identity, not a
+    client-supplied name.
     """
+    operator_name = principal.full_name or principal.username or payload.operator_name
     plan_db = response_service.decide_approval(
         plan_id=plan_id,
         decision=payload.decision,
-        operator_name=payload.operator_name,
+        operator_name=operator_name,
         notes=payload.notes,
         db=db
     )

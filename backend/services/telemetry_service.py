@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from backend.config import settings
-from backend.database.models import CampusResourceDB
+from backend.database.models import CampusResourceDB, TransportTelemetryDB
 from backend.services.event_engine import event_engine
 from backend.services.audit_service import audit_service
 
@@ -22,7 +22,7 @@ class TelemetryService:
         # vehicle_id -> {latitude, longitude, speed, heading, accuracy, timestamp, raw_time}
         self._latest_telemetry: Dict[str, Dict[str, Any]] = {}
 
-    def get_gps_status(self, vehicle_id: str) -> Dict[str, Any]:
+    def get_gps_status(self, vehicle_id: str, db: Optional[Session] = None) -> Dict[str, Any]:
         """
         Calculates strict GPS status for vehicle:
         - LIVE: telemetry received within 15 seconds
@@ -31,6 +31,21 @@ class TelemetryService:
         - GPS OFFLINE: no telemetry recorded
         """
         record = self._latest_telemetry.get(vehicle_id)
+        if not record and db is not None:
+            persisted = db.query(TransportTelemetryDB).filter(
+                TransportTelemetryDB.resource_id == vehicle_id,
+            ).order_by(TransportTelemetryDB.timestamp.desc(), TransportTelemetryDB.id.desc()).first()
+            if persisted:
+                raw_time = persisted.timestamp
+                record = {
+                    "latitude": persisted.latitude,
+                    "longitude": persisted.longitude,
+                    "speed": persisted.speed or 0.0,
+                    "heading": persisted.heading or 0.0,
+                    "accuracy": persisted.accuracy or 0.0,
+                    "timestamp": raw_time.isoformat(),
+                    "raw_time": raw_time,
+                }
         if not record:
             return {
                 "gps_mode": "GPS OFFLINE",
@@ -75,7 +90,9 @@ class TelemetryService:
         accuracy: float,
         timestamp_str: str,
         auth_secret: Optional[str],
-        db: Session
+        db: Session,
+        assignment_id: Optional[int] = None,
+        incident_id: Optional[str] = None,
     ) -> Dict[str, Any]:
 
         # 1. Secret / Device Authentication
@@ -93,6 +110,14 @@ class TelemetryService:
             )
 
         now = datetime.now(timezone.utc)
+        received_timestamp = now
+        if timestamp_str:
+            try:
+                received_timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                if received_timestamp.tzinfo is None:
+                    received_timestamp = received_timestamp.replace(tzinfo=timezone.utc)
+            except ValueError:
+                received_timestamp = now
 
         # 3. Store telemetry ping
         self._latest_telemetry[vehicle_id] = {
@@ -115,23 +140,68 @@ class TelemetryService:
                 resource.availability_status = "en_route"
             db.commit()
 
+        if assignment_id is not None and incident_id:
+            db.add(TransportTelemetryDB(
+                resource_id=vehicle_id,
+                assignment_id=assignment_id,
+                incident_id=incident_id,
+                latitude=latitude,
+                longitude=longitude,
+                timestamp=received_timestamp,
+                speed=max(0.0, speed),
+                heading=heading % 360.0,
+                accuracy=accuracy,
+                source="REAL",
+            ))
+            db.commit()
+
+        route_version = None
+        if assignment_id is not None:
+            # A route is created only after the human-controlled EN_ROUTE state
+            # has been reached and a real GPS point is available.
+            from backend.services.transport_tracking_service import ensure_active_route
+            route = ensure_active_route(db, assignment_id)
+            route_version = route.route_version if route else None
+
         # 5. Broadcast real-time WebSocket event
+        location_payload = {
+            "event": "transport_location_updated",
+            "resource_id": vehicle_id,
+            "assignment_id": assignment_id,
+            "department": "TRANSPORT" if assignment_id is not None else None,
+            "incident_id": incident_id or "live_telemetry",
+            "latitude": latitude,
+            "longitude": longitude,
+            "speed": speed,
+            "heading": heading,
+            "accuracy": accuracy,
+            "gps_mode": "LIVE",
+            "source": "REAL",
+            "route_version": route_version,
+            "timestamp": now.isoformat(),
+        }
         event_engine.publish_event(
-            event_name="vehicle_location_updated",
-            incident_id="live_telemetry",
-            payload={
-                "event_name": "vehicle_location_updated",
-                "resource_id": vehicle_id,
-                "latitude": latitude,
-                "longitude": longitude,
-                "speed": speed,
-                "heading": heading,
-                "accuracy": accuracy,
-                "gps_mode": "LIVE",
-                "source": "LIVE VEHICLE TELEMETRY",
-                "timestamp": now.isoformat()
-            }
+            event_name="transport_location_updated" if assignment_id is not None else "vehicle_location_updated",
+            incident_id=incident_id or "live_telemetry",
+            payload={**location_payload, "event_name": "transport_location_updated" if assignment_id is not None else "vehicle_location_updated"},
         )
+        if assignment_id is not None and route_version is not None and route is not None:
+            event_engine.publish_event(
+                event_name="transport_eta_updated",
+                incident_id=incident_id or "live_telemetry",
+                payload={
+                    "event_name": "transport_eta_updated",
+                    "event": "transport_eta_updated",
+                    "incident_id": incident_id,
+                    "assignment_id": assignment_id,
+                    "department": "TRANSPORT",
+                    "resource_id": vehicle_id,
+                    "route_version": route_version,
+                    "eta_seconds": route.eta_seconds,
+                    "distance_meters": route.distance_m,
+                    "timestamp": now.isoformat(),
+                },
+            )
 
         return {
             "status": "accepted",
@@ -139,7 +209,10 @@ class TelemetryService:
             "latitude": latitude,
             "longitude": longitude,
             "gps_mode": "LIVE",
-            "timestamp": now.isoformat()
+            "timestamp": now.isoformat(),
+            "assignment_id": assignment_id,
+            "incident_id": incident_id,
+            "route_version": route_version,
         }
 
 

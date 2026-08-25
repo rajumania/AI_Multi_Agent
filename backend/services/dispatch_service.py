@@ -14,6 +14,7 @@ from backend.database.database import SessionLocal
 from backend.config import settings
 from backend.services.road_network import road_network
 from backend.services.event_engine import event_engine
+from backend.services.assignment_service import create_required_assignments
 
 
 from backend.services.adapters.sms_adapter import sms_adapter
@@ -96,11 +97,11 @@ class DispatchService:
         # 5. Multi-Channel External Operations via Adapters
         broadcasts: List[BroadcastNotification] = []
 
-        # A. SMS is deliberately optional in the free real-operations demo.
+        # A. SMS remains an optional external integration.
         sms_body = f"CAMPUSFLOW ALERT: {incident.incident_type.upper()} reported near {incident.location}. Dispatched units: {', '.join(dispatched_resources) if dispatched_resources else 'Patrol'}. Keep routes clear."
         broadcasts.append(BroadcastNotification(
             channel="SMS (Optional)",
-            recipient_group="Not configured for this demonstration",
+            recipient_group="Optional provider not configured",
             headline=f"ALERT: {incident.incident_type.upper()} at {incident.location}",
             message=sms_body,
             timestamp=now,
@@ -154,9 +155,13 @@ class DispatchService:
 
         # 6. Transition Incident status
         incident.status = "in_progress"
-        incident.current_step = f"Emergency response initiated. Units dispatched: {', '.join(dispatched_resources) if dispatched_resources else 'Patrol'}. In-app demo alert active; optional provider channels evaluated truthfully."
+        incident.current_step = f"Emergency response initiated. Units dispatched: {', '.join(dispatched_resources) if dispatched_resources else 'Patrol'}. In-app alert active; optional provider channels evaluated truthfully."
         incident.next_action = "Response team en-route. Monitoring telemetry and route geometry."
         db.commit()
+
+        # Department coordination begins only after the approved plan has been
+        # dispatched. Creation is idempotent and stops at NOTIFIED.
+        create_required_assignments(incident, db, actor=plan.approved_by or "System")
 
         event_engine.publish_event(
             event_name="dispatch_started",
@@ -169,6 +174,23 @@ class DispatchService:
                 "status": incident.status,
             },
             db=db,
+        )
+        # Canonical "response dispatched" event for the live command center /
+        # student view. Additive and broadcast-only (db=None): the existing
+        # dispatch_started event above keeps its audit row and current consumers.
+        event_engine.publish_event(
+            event_name="response_dispatched",
+            incident_id=incident.incident_id,
+            payload={
+                "event_name": "response_dispatched",
+                "event": "response_dispatched",
+                "plan_id": plan_id,
+                "status": incident.status,
+                "message": f"Response dispatched: {len(dispatched_resources)} resource(s) en route to {incident.location}.",
+                "dispatched_resources": dispatched_resources,
+                "location": incident.location,
+            },
+            db=None,
         )
         for resource_id in dispatched_resources:
             event_engine.publish_event(
@@ -195,7 +217,7 @@ class DispatchService:
         # 6. Audit Logging
         audit_service.log(
             action_type="automation_execution",
-            description=f"Response workflow initiated for plan {plan_id}. Dispatched {len(dispatched_resources)} unit(s). In-app demo alert displayed; optional provider results recorded.",
+            description=f"Response workflow initiated for plan {plan_id}. Dispatched {len(dispatched_resources)} unit(s). In-app alert displayed; optional provider results recorded.",
             incident_id=incident.incident_id,
             plan_id=plan_id,
             actor="System",
@@ -207,12 +229,12 @@ class DispatchService:
         )
 
         event_engine.publish_event(
-            event_name="demo_push_available",
+            event_name="in_app_alert_available",
             incident_id=incident.incident_id,
             payload={
-                "event_name": "demo_push_available",
-                "description": "In-app DEMO PUSH notification is displayed. No mobile provider delivery claimed.",
-                "channel": "DEMO PUSH — IN APP",
+                "event_name": "in_app_alert_available",
+                "description": "In-app emergency alert is displayed. No external mobile provider delivery claimed.",
+                "channel": "IN-APP ALERT — LOCAL",
             },
             db=db,
         )
@@ -224,7 +246,7 @@ class DispatchService:
             dispatched_resources=dispatched_resources,
             broadcast_alerts=broadcasts,
             executed_at=now,
-            execution_notes=f"Dispatched {len(dispatched_resources)} units for {incident.location}. In-app DEMO PUSH and browser voice are available; optional external channel results are explicitly reported."
+            execution_notes=f"Dispatched {len(dispatched_resources)} units for {incident.location}. In-app alert and browser voice are available; optional external channel results are explicitly reported."
         )
 
     def resolve_incident(
@@ -345,6 +367,7 @@ async def simulate_single_resource(incident_id: str, plan_id: str, resource_id: 
             payload={
                 "event_name": "route_selected",
                 "resource_id": resource_id,
+                "department": resource.department,
                 "origin": origin_node,
                 "destination": dest_node,
                 "route": path,
@@ -363,6 +386,7 @@ async def simulate_single_resource(incident_id: str, plan_id: str, resource_id: 
             payload={
                 "event_name": "response_status_changed",
                 "resource_id": resource_id,
+                "department": resource.department,
                 "status": "dispatched"
             }
         )
@@ -377,6 +401,7 @@ async def simulate_single_resource(incident_id: str, plan_id: str, resource_id: 
             payload={
                 "event_name": "response_status_changed",
                 "resource_id": resource_id,
+                "department": resource.department,
                 "status": "en_route"
             }
         )
@@ -422,6 +447,7 @@ async def simulate_single_resource(incident_id: str, plan_id: str, resource_id: 
                         payload={
                             "event_name": "route_blocked",
                             "resource_id": resource_id,
+                            "department": resource.department,
                             "description": f"En-route segment blocked! Rerouting {resource_id}."
                         }
                     )
@@ -432,6 +458,7 @@ async def simulate_single_resource(incident_id: str, plan_id: str, resource_id: 
                         payload={
                             "event_name": "route_recalculated",
                             "resource_id": resource_id,
+                            "department": resource.department,
                             "route": path,
                             "coordinates": coords,
                             "distance_meters": int(distance),
@@ -463,6 +490,7 @@ async def simulate_single_resource(incident_id: str, plan_id: str, resource_id: 
                 payload={
                     "event_name": "vehicle_location_updated",
                     "resource_id": resource_id,
+                    "department": resource.department,
                     "latitude": lat,
                     "longitude": lng,
                     "status": "en_route",
@@ -494,6 +522,7 @@ async def simulate_single_resource(incident_id: str, plan_id: str, resource_id: 
                 payload={
                     "event_name": "vehicle_arrived",
                     "resource_id": resource_id,
+                    "department": resource.department,
                     "status": "arrived",
                     "latitude": road_network.NODES[dest_node][0],
                     "longitude": road_network.NODES[dest_node][1]
@@ -505,6 +534,7 @@ async def simulate_single_resource(incident_id: str, plan_id: str, resource_id: 
                 payload={
                     "event_name": "response_status_changed",
                     "resource_id": resource_id,
+                    "department": resource.department,
                     "status": "arrived"
                 }
             )

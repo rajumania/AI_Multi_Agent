@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, RefreshCw, Radio, CheckCircle, Circle } from 'lucide-react';
+import { ShieldAlert, RefreshCw, Radio, CheckCircle, Circle, Menu } from 'lucide-react';
 import { HealthResponse } from '../types';
 import { api } from '../services/api';
+import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   health: HealthResponse | null;
@@ -10,9 +11,11 @@ interface HeaderProps {
   wsState?: 'CONNECTED' | 'CONNECTING' | 'OFFLINE';
   user?: any;
   onLogout?: () => void;
+  notificationRefreshKey?: number;
+  onOpenMenu?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ health, loading, onRefresh, wsState = 'OFFLINE', user, onLogout }) => {
+export const Header: React.FC<HeaderProps> = ({ health, loading, onRefresh, wsState = 'OFFLINE', user, onLogout, notificationRefreshKey = 0, onOpenMenu }) => {
   const isHealthy = health?.status === 'healthy';
   const [systemStatus, setSystemStatus] = useState<any>(null);
 
@@ -31,11 +34,15 @@ export const Header: React.FC<HeaderProps> = ({ health, loading, onRefresh, wsSt
     return () => clearInterval(interval);
   }, []);
 
-  const modeText = systemStatus?.raw_mode || 'DEMO MODE';
+  const backendConnected = health?.status === 'healthy' || systemStatus?.backend_status === 'CONNECTED';
+  const modeText = backendConnected ? 'BACKEND CONNECTED' : 'BACKEND OFFLINE';
 
   return (
     <header className="app-header" style={{ flexDirection: 'column', gap: '0.5rem', paddingBottom: '0.5rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <button type="button" className="mobile-menu-button" aria-label="Open navigation" onClick={onOpenMenu}>
+          <Menu size={20} />
+        </button>
         <div className="brand-section">
           <div className="brand-logo-icon">
             <ShieldAlert size={24} />
@@ -54,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({ health, loading, onRefresh, wsSt
         <div className="header-status-group" style={{ gap: '0.75rem' }}>
           <div className="operational-mode-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, padding: '0.4rem 0.75rem', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155' }}>
             <Radio size={14} className="spin-pulse" style={{ color: '#f59e0b' }} />
-            <span>OPERATIONS MODE: {modeText}</span>
+            <span>REAL-TIME CAMPUS EMERGENCY OPERATIONS • {modeText}</span>
           </div>
 
           <div
@@ -63,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({ health, loading, onRefresh, wsSt
             }`}
           >
             <span className="pulse-dot"></span>
-            <span>{isHealthy ? 'Backend Connected' : 'Offline'}</span>
+                <span>{isHealthy ? 'Backend Connected' : loading ? 'Connecting' : 'Backend Offline'}</span>
           </div>
 
           <button
@@ -75,10 +82,12 @@ export const Header: React.FC<HeaderProps> = ({ health, loading, onRefresh, wsSt
             <RefreshCw size={14} className={loading ? 'spin' : ''} />
           </button>
 
+          <NotificationBell refreshKey={notificationRefreshKey} />
+
           {user && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '1px solid #334155', paddingLeft: '0.75rem' }}>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffffff' }}>{user.full_name || user.username}</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffffff' }}>{user.full_name || user.username || user.name}</div>
                 <div style={{ fontSize: '0.62rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>{user.role}</div>
               </div>
               <button 
@@ -94,9 +103,9 @@ export const Header: React.FC<HeaderProps> = ({ health, loading, onRefresh, wsSt
       </div>
 
       <div className="service-status-board">
-        <div><strong>CORE SYSTEM</strong><span><CheckCircle size={11} /> Backend Connected</span><span><CheckCircle size={11} /> WebSocket {wsState}</span><span><CheckCircle size={11} /> Database Connected</span><span><CheckCircle size={11} /> AI Agents Ready</span><span><CheckCircle size={11} /> Incident Engine Ready</span><span><CheckCircle size={11} /> Response Planning Ready</span></div>
-        <div><strong>LIVE DEVICE CAPABILITIES</strong><span><CheckCircle size={11} /> Browser Voice Ready</span><span><Circle size={11} /> GPS — Enable Live GPS</span><span><CheckCircle size={11} /> Demo Push Ready</span></div>
-        <div className="optional-services"><strong>OPTIONAL EXTERNAL INTEGRATIONS</strong><span><Circle size={11} /> Email — Optional</span><span><Circle size={11} /> SMS — Optional</span><span><Circle size={11} /> Phone Call — Optional</span><span><Circle size={11} /> Firebase FCM — Optional</span></div>
+        <div><strong>CORE SYSTEM</strong><span><CheckCircle size={11} /> Backend Connected</span><span><CheckCircle size={11} /> WebSocket {wsState}</span><span><CheckCircle size={11} /> Database Connected</span><span><CheckCircle size={11} /> AI Agents Active</span><span><CheckCircle size={11} /> LangGraph Active</span><span><CheckCircle size={11} /> MCP Connected</span><span><CheckCircle size={11} /> Response Planning Active</span></div>
+        <div><strong>LOCAL DEVICE CAPABILITIES</strong><span><CheckCircle size={11} /> Browser Voice — Enable Audio</span><span><Circle size={11} /> GPS — Enable Live GPS</span><span><CheckCircle size={11} /> In-App Alert Ready</span></div>
+        <div className="optional-services"><strong>OPTIONAL EXTERNAL INTEGRATIONS</strong><span><Circle size={11} /> Email — Optional / Not Configured</span><span><Circle size={11} /> SMS — Optional / Not Configured</span><span><Circle size={11} /> Phone Call — Optional / Not Configured</span><span><Circle size={11} /> Firebase FCM — Optional / Not Configured</span></div>
       </div>
     </header>
   );

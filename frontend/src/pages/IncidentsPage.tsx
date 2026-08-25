@@ -7,8 +7,6 @@ import {
   HeartPulse,
   Filter,
   Radio,
-  Sparkles,
-  ClipboardList,
   ArrowRight,
   AlertCircle
 } from 'lucide-react';
@@ -17,6 +15,7 @@ import {
   Incident,
   SeverityLevel,
   IncidentStatus,
+  LiveEvent,
 } from '../types';
 import { api } from '../services/api';
 import { IncidentCommandView } from '../components/IncidentCommandView';
@@ -26,52 +25,20 @@ interface IncidentsPageProps {
   loading: boolean;
   onOpenReportModal: () => void;
   onRefresh: () => void;
+  liveEvents: LiveEvent[];
 }
 
 export const IncidentsPage: React.FC<IncidentsPageProps> = ({
   incidents,
   loading,
   onOpenReportModal,
-  onRefresh
+  onRefresh,
+  liveEvents,
 }) => {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [loadingIncidentId, setLoadingIncidentId] = useState<string | null>(null);
-
-  const handleAssessIncident = async (incidentId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setLoadingIncidentId(incidentId);
-    setActionError(null);
-    try {
-      const response = await api.analyzeIncident(incidentId);
-      onRefresh();
-      setSelectedIncident(response.incident);
-    } catch (err: any) {
-      setActionError(err.message || 'Assessment failed');
-    } finally {
-      setLoadingIncidentId(null);
-    }
-  };
-
-  const handlePlanIncident = async (incidentId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setLoadingIncidentId(incidentId);
-    setActionError(null);
-    try {
-      await api.generateResponsePlan(incidentId);
-      onRefresh();
-      const updated = incidents.find((i) => i.incident_id === incidentId);
-      if (updated) {
-        setSelectedIncident(updated);
-      }
-    } catch (err: any) {
-      setActionError(err.message || 'Plan preparation failed');
-    } finally {
-      setLoadingIncidentId(null);
-    }
-  };
+  const [actionError] = useState<string | null>(null);
 
   const filteredIncidents = incidents.filter((inc) => {
     if (severityFilter !== 'all' && inc.severity !== severityFilter) return false;
@@ -290,30 +257,6 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {getStatusBadge(incident.status)}
 
-                  {incident.status === 'reported' && (
-                    <button
-                      className="btn btn-sm btn-outline"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderColor: '#38bdf8', color: '#0284c7' }}
-                      disabled={loadingIncidentId === incident.incident_id}
-                      onClick={(e) => handleAssessIncident(incident.incident_id, e)}
-                    >
-                      <Sparkles size={12} />
-                      <span>{loadingIncidentId === incident.incident_id ? 'Assessing...' : 'Assess'}</span>
-                    </button>
-                  )}
-
-                  {incident.status === 'classified' && (
-                    <button
-                      className="btn btn-sm btn-outline"
-                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderColor: '#0284c7', color: '#0284c7' }}
-                      disabled={loadingIncidentId === incident.incident_id}
-                      onClick={(e) => handlePlanIncident(incident.incident_id, e)}
-                    >
-                      <ClipboardList size={12} />
-                      <span>{loadingIncidentId === incident.incident_id ? 'Planning...' : 'Plan Response'}</span>
-                    </button>
-                  )}
-
                   <button
                     className="btn btn-sm"
                     style={{ padding: '0.2rem 0.55rem', fontSize: '0.75rem', background: '#0284c7', color: '#ffffff', border: 'none', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
@@ -334,6 +277,7 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({
         <IncidentCommandView
           incident={selectedIncident}
           onClose={() => setSelectedIncident(null)}
+          liveEvents={liveEvents}
           onRefresh={() => {
             onRefresh();
             // Re-fetch active incident details

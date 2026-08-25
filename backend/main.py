@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from backend.config import settings
 from backend.database.database import engine, Base, get_db, SessionLocal
+from backend.database.migrate import ensure_schema
 from backend.database.seed import seed_resources, seed_users
 from backend.database.models import CampusResourceDB
 from backend.api.incidents import router as incidents_router
@@ -22,12 +23,22 @@ from backend.api.auth import router as auth_router
 from backend.api.telemetry import router as telemetry_router
 from backend.api.voice import router as voice_router
 from backend.api.system import router as system_router
+from backend.api.assignments import router as assignments_router
+from backend.api.notifications import router as notifications_router
+from backend.api.chat import router as chat_router
+from backend.api.campus_locations import router as campus_locations_router
+from backend.api.transport import router as transport_router
+from backend.api.road_conditions import router as road_conditions_router
+from backend.services.notification_service import register_lifecycle_notifications
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database tables
+    # Initialize database tables (creates any brand-new tables).
     Base.metadata.create_all(bind=engine)
+    # Additive, idempotent migration: add new columns to pre-existing tables
+    # and backfill them (department, category, status). Safe on fresh DBs.
+    ensure_schema(engine)
     # Seed initial mock campus resources
     db = SessionLocal()
     try:
@@ -52,6 +63,8 @@ origins = [
     "http://127.0.0.1:5173",
     "http://localhost:5175",
     "http://127.0.0.1:5175",
+    "http://localhost:5176",
+    "http://127.0.0.1:5176",
     "http://localhost:3000",
 ]
 
@@ -77,6 +90,13 @@ app.include_router(auth_router)
 app.include_router(telemetry_router)
 app.include_router(voice_router)
 app.include_router(system_router)
+app.include_router(assignments_router)
+app.include_router(notifications_router)
+app.include_router(chat_router)
+app.include_router(campus_locations_router)
+app.include_router(transport_router)
+app.include_router(road_conditions_router)
+register_lifecycle_notifications()
 
 
 

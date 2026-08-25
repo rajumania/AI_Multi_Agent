@@ -1,11 +1,14 @@
 from typing import Dict, Any, List
 from datetime import datetime, timezone
 from backend.graph.state import EmergencyGraphState
+from backend.models.incident import SupervisorAnalysisResult
 from backend.agents.supervisor import supervisor_agent
 from backend.agents.security import security_agent
 from backend.agents.medical import medical_agent
 from backend.agents.transport import transport_agent
 from backend.agents.communication import communication_agent
+from backend.agents.fire import fire_agent
+from backend.agents.facilities import facilities_agent
 
 
 def now_stamp() -> str:
@@ -22,12 +25,18 @@ def supervisor_node(state: EmergencyGraphState) -> Dict[str, Any]:
     reported_location = state.get("location")
     reported_by = state.get("reported_by")
 
-    # Run Supervisor Agent Analysis
-    analysis = supervisor_agent.analyze_incident(
-        description=description,
-        reported_location=reported_location,
-        reported_by=reported_by
-    )
+    # Reuse the real intake result when the preceding API request already
+    # completed the supervisor stage; direct graph callers still run the agent.
+    cached_analysis = state.get("supervisor_analysis")
+    if cached_analysis:
+        analysis = SupervisorAnalysisResult.model_validate(cached_analysis)
+    else:
+        analysis = supervisor_agent.analyze_incident(
+            description=description,
+            reported_location=reported_location,
+            reported_by=reported_by,
+            incident_id=state.get("incident_id"),
+        )
 
     audit = state.get("audit_trail", []).copy()
     audit.append(
@@ -162,6 +171,58 @@ def communication_node(state: EmergencyGraphState) -> Dict[str, Any]:
     }
 
 
+def fire_node(state: EmergencyGraphState) -> Dict[str, Any]:
+    """
+    Fire & Safety Agent Node:
+    Generates fire suppression, containment, and structure-evacuation recommendations.
+    """
+    incident_type = state.get("incident_type", "unknown")
+    severity = state.get("severity", "medium")
+    location = state.get("location", "Campus Premises")
+    description = state.get("description", "")
+
+    result = fire_agent.evaluate(
+        incident_type=incident_type,
+        severity=severity,
+        location=location,
+        description=description
+    )
+
+    audit = state.get("audit_trail", []).copy()
+    audit.append(f"[{now_stamp()}] Fire & Safety Agent: Generated {len(result.get('actions', []))} suppression/containment actions.")
+
+    return {
+        "fire_result": result,
+        "audit_trail": audit
+    }
+
+
+def facilities_node(state: EmergencyGraphState) -> Dict[str, Any]:
+    """
+    Facilities & Maintenance Agent Node:
+    Generates infrastructure isolation, utility-shutdown, and repair-crew recommendations.
+    """
+    incident_type = state.get("incident_type", "unknown")
+    severity = state.get("severity", "medium")
+    location = state.get("location", "Campus Premises")
+    description = state.get("description", "")
+
+    result = facilities_agent.evaluate(
+        incident_type=incident_type,
+        severity=severity,
+        location=location,
+        description=description
+    )
+
+    audit = state.get("audit_trail", []).copy()
+    audit.append(f"[{now_stamp()}] Facilities & Maintenance Agent: Generated {len(result.get('actions', []))} infrastructure actions.")
+
+    return {
+        "facilities_result": result,
+        "audit_trail": audit
+    }
+
+
 def synthesizer_node(state: EmergencyGraphState) -> Dict[str, Any]:
     """
     Synthesizer Node:
@@ -214,6 +275,24 @@ def synthesizer_node(state: EmergencyGraphState) -> Dict[str, Any]:
             all_recommendations.append(f"[Comms] {a}")
         if com.get("broadcast_priority") in ["high", "urgent"]:
             required_approvals.append(f"Broadcast All-Campus Emergency Alert: '{com.get('alert_headline')}'")
+
+    fire = state.get("fire_result")
+    if fire:
+        add_mcp_items(fire.get("matched_resources", []))
+        if "actions" in fire:
+            for a in fire["actions"]:
+                all_recommendations.append(f"[Fire] {a}")
+        if fire.get("evacuation_required"):
+            required_approvals.append("Authorize Structure Evacuation for Fire Hazard")
+
+    fac = state.get("facilities_result")
+    if fac:
+        add_mcp_items(fac.get("matched_resources", []))
+        if "actions" in fac:
+            for a in fac["actions"]:
+                all_recommendations.append(f"[Facilities] {a}")
+        if fac.get("utility_shutdown_required"):
+            required_approvals.append("Authorize Utility (Power/Gas/Water) Shutdown")
 
     audit = state.get("audit_trail", []).copy()
     resource_id_list = [r['resource_id'] for r in mcp_resources]

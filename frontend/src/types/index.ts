@@ -1,5 +1,6 @@
 export type IncidentType =
   | 'fire'
+  | 'chemical'
   | 'medical'
   | 'security'
   | 'accident'
@@ -45,7 +46,10 @@ export interface Incident {
   injured_count: number | null; // Strict null for unknown
   evidence_source?: string;
   reported_by?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   status: IncidentStatus;
+  ai_provider_status?: string | null;
   current_step?: string;
   next_action?: string;
   summary?: string;
@@ -53,6 +57,7 @@ export interface Incident {
   resolved_at?: string;
   closed_at?: string;
   resolution_note?: string;
+  required_departments?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -223,6 +228,17 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+export interface CampusLocation {
+  location_id: string;
+  name: string;
+  kind: string;
+  latitude: number;
+  longitude: number;
+  aliases: string[];
+  coordinate_source: string;
+  verification_status: string;
+}
+
 export interface LiveEvent {
   event_name: string;
   incident_id?: string;
@@ -230,6 +246,72 @@ export interface LiveEvent {
   time_display?: string;
   description?: string;
   [key: string]: any;
+}
+
+export type DepartmentAssignmentStatus =
+  | 'NOTIFIED'
+  | 'ACCEPTED'
+  | 'DECLINED'
+  | 'TEAM_ASSIGNED'
+  | 'EN_ROUTE'
+  | 'ON_SCENE'
+  | 'COMPLETED';
+
+export interface DepartmentAssignment {
+  id: number;
+  incident_id: string;
+  department: string;
+  status: DepartmentAssignmentStatus | string;
+  accepted: number;
+  message?: string | null;
+  responder?: string | null;
+  assigned_resources: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TransportTracking {
+  assignment_id: number;
+  incident_id: string;
+  department: string;
+  resource_id?: string | null;
+  team_identity?: string | null;
+  status: string;
+  incident_location: string;
+  incident_latitude?: number | null;
+  incident_longitude?: number | null;
+  current_latitude?: number | null;
+  current_longitude?: number | null;
+  last_gps_update?: string | null;
+  gps_source: 'REAL' | 'UNAVAILABLE' | string;
+  route?: {
+    coordinates?: [number, number][];
+    route_version?: number;
+    distance_meters?: number;
+    eta_seconds?: number;
+    geometry_source?: string;
+    status?: string;
+    updated_at?: string | null;
+  } | null;
+  eta_seconds?: number | null;
+  route_warning?: string | null;
+}
+
+export interface AssignmentTeamPayload {
+  resource_ids: string[];
+  team_name?: string;
+}
+
+export interface NotificationItem {
+  id: number;
+  recipient_type: string;
+  department?: string | null;
+  incident_id?: string | null;
+  title: string;
+  message: string;
+  level: string;
+  read: number;
+  created_at: string;
 }
 
 

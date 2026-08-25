@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Shield, Lock, User, Sparkles, AlertCircle, Briefcase, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
 
-interface SignupPageProps {
-  onSignupSuccess: () => void;
-  onNavigateToLogin: () => void;
-}
-
-export const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLogin }) => {
+export const SignupPage: React.FC = () => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [fullName, setFullName] = useState<string>('');
@@ -33,7 +30,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavig
       });
       setSuccess(true);
       setTimeout(() => {
-        onSignupSuccess();
+        navigate('/login');
       }, 1500);
     } catch (err: any) {
       setError(err.message || 'Signup failed. Please try again.');
@@ -323,7 +320,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavig
         <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.78rem', color: '#94a3b8' }}>
           Already have an account?{' '}
           <span
-            onClick={onNavigateToLogin}
+            onClick={() => navigate('/login')}
             style={{ color: '#38bdf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
           >
             Sign In Here
