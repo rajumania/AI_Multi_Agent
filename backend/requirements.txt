@@ -1,18 +1,16 @@
-fastapi>=0.110.0
-uvicorn[standard]>=0.28.0
-pydantic>=2.6.0
-pydantic-settings>=2.2.0
-sqlalchemy>=2.0.28
-pytest>=8.0.0
-httpx>=0.27.0
-twilio>=9.0.0
-firebase-admin>=6.5.0
-langgraph>=1.2.0
-langchain-core>=1.6.0
-# Existing chatbot provider implementation uses the Google Generative AI SDK.
-google-generativeai>=0.8.5
-# Optional hosted long-term memory client. The application reports memory as
-# unavailable until MEM0_API_KEY is configured; it never substitutes another
-# provider.
-mem0ai>=0.1.115
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.13.4
+pydantic-settings==2.11.0
+sqlalchemy==2.0.52
+psycopg[binary]==3.2.10
+httpx==0.28.1
 
+twilio==9.11.0
+firebase-admin==7.5.0
+
+langgraph==1.2.11
+langchain-core==1.6.0
+
+google-generativeai==0.8.6
+mem0ai==2.0.19
