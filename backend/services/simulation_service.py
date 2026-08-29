@@ -14,14 +14,14 @@ from backend.services.dispatch_service import dispatch_service
 class SimulationService:
     """
     Digital Twin Autonomous Emergency Simulation Engine.
-    Executes autonomous campus emergency scenarios and handles live resource failure injection
+    Executes autonomous emergency scenarios and handles live resource failure injection
     to showcase dynamic agentic re-planning.
     """
 
     SCENARIOS = {
         "ublock_fire": {
             "title": "🔥 Active Fire & Smoke in U-Block (CSE & IT)",
-            "description": "Dense smoke and active flames observed on 2nd floor CSE lab in U-Block. Students initiating stairwell evacuation.",
+            "description": "Dense smoke and active flames observed on 2nd floor CSE lab in U-Block. Occupants initiating stairwell evacuation.",
             "location": "U-Block (CSE & IT)",
             "incident_type": "fire",
             "injured_count": None,
@@ -33,7 +33,7 @@ class SimulationService:
         },
         "hostel_medical": {
             "title": "🏥 Acute Medical Emergency in Mahalakshmi Hostel",
-            "description": "Student in 3rd floor room collapsed with acute respiratory distress. First aid volunteer on scene.",
+            "description": "Community member in 3rd floor room collapsed with acute respiratory distress. First aid volunteer on scene.",
             "location": "Mahalakshmi & Vasishta Hostels",
             "incident_type": "medical",
             "injured_count": 1,
@@ -45,8 +45,8 @@ class SimulationService:
         },
         "gate_security": {
             "title": "🚨 Security Perimeter Breach at Main Gate",
-            "description": "Unauthorized speeding vehicle bypassed entry barricade at Main Vadlamudi Gate heading towards Academic Quad.",
-            "location": "Main Vadlamudi Entrance Gate",
+            "description": "Unauthorized speeding vehicle bypassed the Main Response Gate barricade heading towards Academic Quad.",
+            "location": "Main Response Gate",
             "incident_type": "security",
             "injured_count": 0,
             "primary_ambulance": "AMB-001",
@@ -78,7 +78,7 @@ class SimulationService:
             status="awaiting_approval",
             current_step="Multi-agent emergency plan formulated. Awaiting commander authorization for public broadcast.",
             next_action="Commander must authorize deployment before units depart.",
-            reported_by="Campus Digital Twin Simulator",
+            reported_by="AITAM Digital Twin Simulator",
             created_at=now,
             updated_at=now
         )
@@ -93,7 +93,7 @@ class SimulationService:
             action="evaluate_incident_intake",
             thought=f"Received emergency intake at {scenario['location']}. Initiating deterministic severity evaluation and spatial geocoding.",
             confidence=0.96,
-            why=f"High priority report matching {scenario['incident_type']} keywords inside active campus quadrant."
+            why=f"High priority report matching {scenario['incident_type']} keywords inside active response area."
         )
 
         # 3. Evaluate Severity with Deterministic Engine
@@ -140,7 +140,7 @@ class SimulationService:
             why=f"{amb_team['name'] if amb_team else 'Ambulance 1'} ready with 2-stretcher capacity at Health Centre."
         )
 
-        route_info = campus_mcp_tools.calculate_emergency_route("Campus Health Centre", scenario["location"])
+        route_info = campus_mcp_tools.calculate_emergency_route("AITAM Health Centre", scenario["location"])
         event_engine.log_trace(
             incident_id=inc_id,
             agent_name="Transport Agent",
@@ -205,10 +205,10 @@ class SimulationService:
             incident_id=incident_id,
             agent_name="Medical Agent (Autonomous Re-Planner)",
             action="replan_alternate_resource",
-            thought=f"Re-evaluating campus fleet: Selected alternate asset {alt_id} ({alternate_unit.name if alternate_unit else 'Ambulance 2'}).",
+            thought=f"Re-evaluating response fleet: Selected alternate asset {alt_id} ({alternate_unit.name if alternate_unit else 'Ambulance 2'}).",
             tool_call={"substituted_unit": alt_id, "replaced_unit": failed_resource_id},
             confidence=0.94,
-            why=f"Closest available operational {failed_res.resource_type if failed_res else 'unit'} in campus pool."
+            why=f"Closest available operational {failed_res.resource_type if failed_res else 'unit'} in response pool."
         )
 
         # Update latest response plan

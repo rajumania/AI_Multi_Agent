@@ -5,6 +5,7 @@ pydantic-settings==2.11.0
 sqlalchemy==2.0.52
 psycopg[binary]==3.2.10
 httpx==0.28.1
+python-multipart==0.0.20
 
 twilio==9.11.0
 firebase-admin==7.5.0

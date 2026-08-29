@@ -8,14 +8,14 @@ import { NotificationBell } from './NotificationBell';
 // ---------------------------------------------------------------------------
 // PortalHeader — identity indicator for the citizen & department portals.
 //
-// Intentionally minimal: it shows the CampusFlow brand, the required identity
+// Intentionally minimal: it shows the AITAM brand, the required identity
 // indicator (Name, Role, Department) and a Logout button — and NOTHING about
 // internal system state (no AI-agents / LangGraph / MCP service board that the
 // operator Header shows). This keeps internal reasoning out of citizen/dept view.
 // ---------------------------------------------------------------------------
 
 interface PortalHeaderProps {
-  /** Short portal name shown next to the brand, e.g. "Campus Member Portal". */
+  /** Short portal name shown next to the brand, e.g. "Community Portal". */
   subtitle: string;
   /** Accent color for the portal badge. */
   accent?: string;
@@ -63,7 +63,7 @@ export const PortalHeader: React.FC<PortalHeaderProps> = ({ subtitle, accent = '
         </div>
         <div>
           <div style={{ fontSize: '0.95rem', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-            CAMPUSFLOW AI
+            AITAM DISASTER RESPONSE AI
           </div>
           <div style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span>{subtitle}</span>

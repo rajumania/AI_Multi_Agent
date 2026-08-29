@@ -1,59 +1,115 @@
-# PHASE 2 REPORT — Frontend: Real-Time Agent Workflow State (WebSocket-driven)
+# Phase 2 Report — Environmental Ingestion, Risk Prediction & Early Warning
 
-**Part of:** CampusFlow AI — Real-Time 3D Command Center master plan
-**Date:** 2026-08-23
-**Rule compliance:** Additive only. Reuses the EXISTING events WebSocket (no duplicate WS infrastructure). No timers, no synthetic progress — state is derived purely from real backend events. Backend remains the source of truth; this layer only *reflects* it. Operator dashboard, auth, routing, and all existing frontend code are untouched.
+## Status
 
----
+Phase 2 is complete. The implementation is additive and preserves the existing FastAPI, SQLAlchemy, authentication/RBAC, LangGraph incident workflow, notification table, WebSocket endpoint, frontend design system, and deployment configuration.
 
-## PHASE
-Phase 2 — a normalized, per-incident **agent workflow state model** on the frontend, driven entirely by the real events the backend emits (Phase 1). This is the data layer the 3D command center (Phase 3+) will render.
+This prototype provides decision-support risk estimation and is not an authoritative disaster forecasting system.
 
-## STATUS
-Implementation COMPLETE. Test execution PENDING on the Windows venv (this environment cannot run `npm`/`vitest`/`tsc`).
+## 1. Weather provider architecture
 
-## Implemented
-A new, self-contained `src/realtime/` module — nothing else in the app changed:
+`backend/services/weather_providers.py` defines a normalized `WeatherProvider` contract and two implementations:
 
-- **`workflowReducer.ts` (PURE, DOM-free).** The heart of Phase 2. `reduceRealtime(state, event)` folds one real `LiveEvent` into a normalized state:
-  - Per incident, the eight real pipeline agents (supervisor → security → medical → transport → communication → fire → facilities → synthesizer), each with `status` (`idle`/`working`/`completed`/`failed`), `message`, structured `output`, `error`, and real `startedAt`/`completedAt` timestamps taken from the events.
-  - Approval state (`required`, `pending`/`approved`/`rejected`, `planId`, `approvedBy`) and dispatch state (`dispatched`, `resources`, `location`) — all set only by real `approval_required` / `approval_approved` (+ legacy `approval_granted`) / `approval_rejected` / `response_dispatched` (+ existing `dispatch_started`) events.
-  - `derivePhase()` computes a single human-facing workflow phase (`idle → analyzing → coordinating → synthesizing → planned → awaiting_approval → approved → rejected → dispatched → resolved`, plus `attention` on failure) from accumulated signals, so it is correct regardless of event arrival order.
-  - `workflowProgress()` returns a truthful completion fraction (nodes the backend actually finished ÷ total) — a real progress signal, never time-based.
-  - Order-tolerant and idempotent (a `completed`/`failed` event stands alone; re-delivery is harmless); future-proof (an unknown agent key is tracked and labeled from the event, never dropped); bounded (`MAX_TRACKED_INCIDENTS = 25`, least-recently-active pruned) so a long demo can't grow without limit. Irrelevant channels (map/telemetry/notifications) and `system`/`live_telemetry` ids are ignored, returning the same state object (so consumers don't re-render).
-- **`RealtimeWorkflowProvider.tsx`.** A React context provider that owns **one** WebSocket to the EXISTING endpoint via the shared `buildEventsWsUrl()` helper (token-scoped like every other connection), folds each frame through the pure reducer with `useReducer`, and exposes `{ state, wsState, activeWorkflow, getWorkflow, lastEvent }` through a `useRealtimeWorkflow()` hook. Same proven reconnect/backoff pattern as the operator dashboard. It is read-only: all mutations still go through the existing REST APIs.
+- `ExternalWeatherProvider`: OpenWeather-compatible HTTP adapter selected only when `WEATHER_PROVIDER` is `external`, `openweather`, or `live` and both backend-only URL/key settings exist.
+- `DemoWeatherProvider`: deterministic, clearly labelled demo observations for reliable development and demonstrations.
+- `fetch_with_fallback`: handles provider configuration errors, HTTP failures, timeouts, and invalid provider payloads by returning `DEMO_FALLBACK` data and a structured error string. Secrets never enter response payloads.
 
-## Files changed
-- `frontend/src/realtime/workflowReducer.ts` — **NEW** (pure state model + selectors).
-- `frontend/src/realtime/RealtimeWorkflowProvider.tsx` — **NEW** (single-connection provider + `useRealtimeWorkflow` hook).
-- `frontend/src/realtime/workflowReducer.test.ts` — **NEW** (Vitest, DOM-free): ~20 cases covering agent lifecycle, structured-output capture, order-tolerance, failure/attention, unknown-agent tracking, full 8-agent pipeline, progress fractions, approval/dispatch/lifecycle transitions, phase precedence, an end-to-end phase sequence, idempotency, pruning cap, and safe coercion of malformed payloads.
+Normalized weather includes coordinates, condition, temperature, humidity, rainfall, intensity, wind, pressure, precipitation probability, observation time, receipt time, and source.
 
-No existing files were modified.
+## 2. Environmental data architecture
 
-## Existing functionality preserved
-**YES.** Purely additive new files. The operator dashboard keeps its own inline socket and behaves exactly as before; auth, routing, portals, and the 38 existing frontend tests are untouched. The new provider is not mounted yet (wired in Phase 5), so there is no second live connection in the current app.
+`EnvironmentalObservationDB` stores normalized indicator/value records with zone, coordinates, observation time, receipt time, unit, and source. `DemoEnvironmentalProvider` supplies explicitly demo-labelled water level, soil moisture, and drainage signals when no environmental records exist. The weather API exposes environmental ingestion and history under `/api/v1/weather/environment`.
 
-## Backend tests
-N/A this phase (frontend-only). Phase 1's backend suites are unaffected.
+## 3. Risk feature engine
 
-## Frontend tests
-TO BE RUN BY USER (this environment cannot execute npm/vitest):
+`RiskFeatureEngine` combines weather, environmental, zone geography, historical metadata, population exposure, and recent community rescue reports. All feature values are bounded to 0–100. Missing values remain absent; the scoring engine renormalizes weights over available factors rather than treating missing evidence as high risk.
 
-```
-cd frontend
-npm run test        # vitest: expect the existing suites + the new realtime suite green
-npm run build       # tsc && vite build: expect a clean type-check + production build
-```
+Supported features include rainfall, intensity, water level, low-elevation vulnerability, slope, soil moisture, terrain, drainage, historical risk, community signal, population exposure, wind, pressure, temperature, humidity, weather severity, coastal vulnerability, and heat duration.
 
-Baseline to preserve: the 38 existing tests still pass and the production build still succeeds; target is baseline + the new `workflowReducer` suite.
+## 4. Risk formula
 
-## Build
-No dependencies added (Rule 23 honored) — uses only React (already present) and the existing `buildEventsWsUrl` helper. New files are written to compile under the repo's strict `tsc` (`strict`, `noUnusedLocals/Parameters`, `noFallthroughCasesInSwitch`).
+For each disaster type:
 
-## Known issues / notes
-- The provider is intentionally **not mounted** in Phase 2 to avoid a second WebSocket alongside the operator dashboard's existing one. Phase 5 mounts it around the command-center view (which is not rendered at the same time as the legacy dashboard) or refactors the dashboard to consume it — either way, one connection.
-- `agent_progress` is handled as a working-state signal but the backend deliberately doesn't emit it (atomic nodes) — the branch stays dormant, consistent with the no-fake-progress rule.
-- This model consumes operator/admin-visible events (agent_*, approval_*). Citizens don't receive those by RBAC, so Phase 4 will add a separate user-safe progress projection rather than reusing this model directly.
+`risk_score = sum(feature_score × configured_weight) / sum(weights for available features)`
 
-## Next phase
-Phase 3 — the lazy-loaded 3D agent system (Three.js, code-split so login/signup stay lightweight) that renders this state model, with a non-3D fallback.
+The result is clamped to 0–100 and classified as:
+
+- 0–24 LOW
+- 25–49 MEDIUM
+- 50–74 HIGH
+- 75–100 CRITICAL
+
+Default weights are centralized in `risk_engine.py` and can be overridden with `RISK_WEIGHTS_JSON`. The defaults are disaster-specific: flood and urban flood emphasize rainfall/water/drainage; landslide emphasizes rainfall, slope, soil moisture and terrain; cyclone emphasizes wind, pressure and coastal vulnerability; heatwave emphasizes temperature, humidity and duration; severe weather emphasizes wind, rainfall and weather severity.
+
+## 5. Confidence and freshness
+
+Confidence is calculated independently from risk using evidence coverage, source coverage, feature completeness, and freshness. It is not a probability of disaster. Observations include `timestamp`/`observed_at`, `received_at`, and `source`. Data older than `WEATHER_STALE_AFTER_MINUTES` is marked stale and confidence is reduced. API and UI status labels distinguish LIVE, DEMO, MIXED, MANUAL, and STALE DATA.
+
+## 6. Explanation and LangGraph integration
+
+`backend/graph/risk_workflow.py` is a dedicated LangGraph workflow with two stages:
+
+1. deterministic risk engine produces score, level, confidence, features;
+2. `RiskPredictionAgent` turns those structured results into a briefing, factors, and recommendations.
+
+The agent cannot invent or override numerical risk. Existing incident LangGraph topology and all existing agents remain unchanged. Existing agents remain available for future mapping: Medical → hospital/medical coordination; Transport → emergency vehicles; Communication → alerts; Facilities → infrastructure/resources; Security → emergency services/rescue coordination; Supervisor → response orchestration.
+
+## 7. Early warning and alert deduplication
+
+`EarlyWarningService` maps LOW/MEDIUM to monitoring guidance, HIGH to a warning recommendation, and CRITICAL to a critical warning recommendation. HIGH and CRITICAL predictions create records in the existing `NotificationDB` alert system. A zone-level cooldown prevents repeated alert spam; a HIGH → CRITICAL escalation is allowed through the cooldown. No dangerous real-world action is automatically executed.
+
+## 8. API endpoints
+
+- `POST /api/v1/risk/predict`
+- `GET /api/v1/risk`
+- `GET /api/v1/risk/{prediction_id}`
+- `GET /api/v1/risk/zones`
+- `GET /api/v1/risk/summary`
+- `GET /api/v1/risk/early-warnings`
+- `GET /api/v1/weather/current`
+- `GET /api/v1/weather/history`
+- `GET /api/v1/weather/zone/{zone_id}`
+- `POST /api/v1/weather/ingest`
+- `POST /api/v1/weather/environment`
+- `GET /api/v1/weather/environment`
+- `POST /api/v1/demo/scenarios/flood-critical`
+
+Prediction and ingestion mutations use the existing command-principal dependency. Existing routes remain registered.
+
+## 9. Demo mode
+
+`POST /api/v1/demo/scenarios/flood-critical` writes severe rainfall, rising water, drainage, soil moisture, and 17 community-report signals for `DEMO-ZONE-A`, then runs the normal ingestion → feature → risk → LangGraph → warning → persistence path. The final score is not hard-coded. Every record is labelled `DEMO_SCENARIO`, and the UI displays DEMO DATA.
+
+## 10. Failure handling
+
+External provider credentials are read only by the backend. Provider timeout/failure and invalid values fall back to deterministic demo data with warning logging. Incoming API measurements reject non-finite values, impossible coordinates, and bounded outliers through Pydantic validation. Existing event handling continues even when no WebSocket client is connected.
+
+## 11. Realtime integration
+
+The existing `/api/v1/events/ws` endpoint now broadcasts `risk_updated`, `early_warning_created`, `weather_updated`, and `environment_updated`. The dashboard reuses its current WebSocket and refreshes the risk summary when these events arrive; no parallel realtime system was introduced.
+
+## 12. Frontend
+
+`RiskPanel` is a functional backend-driven dashboard panel showing score, level, confidence, factors, recommendations, freshness/data status, warning status, and a compact history trend. The Risk & Early Warning navigation view uses the same component. It shows an honest empty state when no prediction exists and never embeds demo risk values in React.
+
+## 13. Database changes
+
+Additive fields were added to zones, weather observations, environmental observations, and risk predictions. Existing legacy observation rows are backfilled with `received_at = observed_at` where possible. Existing rows and tables are preserved; no database drop or destructive migration was used.
+
+## 14. Tests and validation
+
+- Phase 2 backend tests: 14 passed.
+- Full backend suite: 102 passed (88 Phase 1 baseline + 14 Phase 2 tests).
+- Frontend tests: 92 passed.
+- Frontend production build: successful; existing large-chunk warning remains.
+- End-to-end smoke: demo prediction persisted and returned through `/risk`; repeated demo execution produced one alert within cooldown.
+- Backend application import and route registration: successful.
+
+The Phase 1 baseline was backend 88 passed, frontend 92 passed, legacy 52 passed/1 skipped with the known timing-related failure. After Phase 2, frontend remains 92 passed; legacy remains 52 passed/1 skipped with that same known timing-related failure. The legacy timing failure is not hidden or deleted.
+
+## 15. Known limitations before Phase 3
+
+- External provider adapters are intentionally OpenWeather-compatible rather than a broad multi-provider catalog.
+- Environmental live sensor connectors, advanced scientific forecasting, geospatial vulnerability layers, offline/PWA support, and rescue-request prioritization remain later phases.
+- The existing local environment may still show the previously documented Vite dev-server/node_modules permission issue; the production build succeeds.
+- Risk is decision support only and requires qualified emergency-management review before operational use.

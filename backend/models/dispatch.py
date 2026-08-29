@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class BroadcastNotification(BaseModel):
     channel: str = Field(..., description="Communication channel (e.g. Campus SMS, PA Audio, Mobile App)")
-    recipient_group: str = Field(..., description="Target audience (e.g. All Students, Building Wardens, Emergency Responders)")
+    recipient_group: str = Field(..., description="Target audience (e.g. Community, Building Wardens, Emergency Responders)")
     headline: str = Field(..., description="Short broadcast title")
     message: str = Field(..., description="Full broadcast message content")
     timestamp: datetime = Field(default_factory=datetime.utcnow)

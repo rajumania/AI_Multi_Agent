@@ -31,7 +31,7 @@ export const ResponsesPage: React.FC = () => {
     try {
       await api.decideApproval(planId, {
         decision,
-        operator_name: 'Campus Safety Commander',
+        operator_name: 'AITAM Response Commander',
         notes: decision === 'approve' ? 'Direct command authorization.' : 'Plan rejected from responses board.'
       });
       fetchPlans();
@@ -52,7 +52,7 @@ export const ResponsesPage: React.FC = () => {
       <div className="dashboard-title-row">
         <div>
           <h2>Emergency Response Plans & Authorization Board</h2>
-          <p>Operational action plans formulated from emergency assessments, campus safety protocols, and verified resource coordination.</p>
+          <p>Operational action plans formulated from emergency assessments, response protocols, and verified resource coordination.</p>
         </div>
 
         <div className="quick-actions-group">

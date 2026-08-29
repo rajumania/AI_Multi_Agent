@@ -16,7 +16,7 @@ def _auth(token):
 
 def _register(client, suffix):
     response = client.post("/api/v1/auth/user/register", json={
-        "email": f"phase8-{suffix}@vignan.ac.in",
+        "email": f"phase8-{suffix}@aitam.local",
         "phone": f"90000{suffix:05d}" if isinstance(suffix, int) else "9000099999",
         "full_name": f"Phase 8 {suffix}",
     })

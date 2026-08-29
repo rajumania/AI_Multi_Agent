@@ -69,7 +69,7 @@ def _department_token(client, email, department):
 def _citizen_token(client):
     r = client.post(
         "/api/v1/auth/user/login",
-        json={"email": "student@vignan.ac.in", "phone": "9000000000"},
+        json={"email": "community@aitam.local", "phone": "9000000000"},
     )
     assert r.status_code == 200, r.text
     return r.json()["token"]
@@ -92,9 +92,9 @@ class TestDepartmentRouting:
         assert dept.is_valid_department("FIRE") is True
         assert dept.is_valid_department("hr") is False
 
-    def test_six_canonical_departments(self):
+    def test_eight_canonical_departments(self):
         assert dept.DEPARTMENTS == (
-            "SECURITY", "MEDICAL", "TRANSPORT", "COMMUNICATION", "FIRE", "FACILITIES",
+            "MEDICAL", "SEARCH_AND_RESCUE", "FIRE", "SECURITY", "TRANSPORT", "COMMUNICATION", "FACILITIES", "SHELTER",
         )
 
     def test_resource_type_to_department(self):
@@ -103,7 +103,7 @@ class TestDepartmentRouting:
         assert dept.department_for_resource_type("security") == "SECURITY"
         assert dept.department_for_resource_type("fire_response") == "FIRE"
         assert dept.department_for_resource_type("facility") == "FACILITIES"
-        assert dept.department_for_resource_type("shelter") == "FACILITIES"
+        assert dept.department_for_resource_type("shelter") == "SHELTER"
         assert dept.department_for_resource_type("vehicle") == "TRANSPORT"
         # "other" is intentionally unmapped.
         assert dept.department_for_resource_type("other") is None
@@ -119,7 +119,7 @@ class TestDepartmentRouting:
 
     def test_departments_for_incident_base(self):
         assert dept.departments_for_incident("fire") == [
-            "FIRE", "SECURITY", "MEDICAL", "COMMUNICATION",
+            "FIRE", "MEDICAL", "SECURITY", "TRANSPORT", "FACILITIES", "COMMUNICATION",
         ]
         assert dept.departments_for_incident("medical", "low") == ["MEDICAL", "SECURITY"]
         assert dept.departments_for_incident("unknown") == ["SECURITY"]
@@ -275,31 +275,31 @@ class TestAuthApi:
     def test_citizen_login_wrong_phone(self, client):
         r = client.post(
             "/api/v1/auth/user/login",
-            json={"email": "student@vignan.ac.in", "phone": "0000000000"},
+            json={"email": "community@aitam.local", "phone": "0000000000"},
         )
         assert r.status_code == 400
 
     def test_department_login_and_me(self, client):
-        token = _department_token(client, "security@vignan.ac.in", "SECURITY")
+        token = _department_token(client, "security@aitam.local", "SECURITY")
         me = client.get("/api/v1/auth/me", headers=_bearer(token))
         assert me.status_code == 200
         body = me.json()
         assert body["subject_type"] == SUBJECT_DEPARTMENT
         assert body["department"] == "SECURITY"
-        assert body.get("department_label") == "Campus Security"
+        assert body.get("department_label") == "Security / Public Safety"
 
     def test_department_login_wrong_department_rejected(self, client):
         # Correct credentials but claiming a department the account isn't in.
         r = client.post(
             "/api/v1/auth/department/login",
-            json={"email": "security@vignan.ac.in", "password": "password123", "department": "MEDICAL"},
+            json={"email": "security@aitam.local", "password": "password123", "department": "MEDICAL"},
         )
         assert r.status_code == 403
 
     def test_department_login_wrong_password(self, client):
         r = client.post(
             "/api/v1/auth/department/login",
-            json={"email": "security@vignan.ac.in", "password": "wrong", "department": "SECURITY"},
+            json={"email": "security@aitam.local", "password": "wrong", "department": "SECURITY"},
         )
         assert r.status_code == 400
 
@@ -322,7 +322,7 @@ class TestPrivilegeBoundaries:
     def test_department_register_requires_auth(self, client):
         r = client.post(
             "/api/v1/auth/department/register",
-            json={"email": "new-dept@vignan.ac.in", "password": "password123", "department": "FIRE"},
+            json={"email": "new-dept@aitam.local", "password": "password123", "department": "FIRE"},
         )
         # No token at all -> get_current_principal raises 401.
         assert r.status_code == 401
@@ -332,13 +332,13 @@ class TestPrivilegeBoundaries:
         r = client.post(
             "/api/v1/auth/department/register",
             headers=_bearer(token),
-            json={"email": "new-dept2@vignan.ac.in", "password": "password123", "department": "FIRE"},
+            json={"email": "new-dept2@aitam.local", "password": "password123", "department": "FIRE"},
         )
         assert r.status_code == 403
 
     def test_department_register_allowed_for_admin(self, client):
         token = _operator_token(client)
-        email = f"crew_{int(time.time()*1000)}@vignan.ac.in"
+        email = f"crew_{int(time.time()*1000)}@aitam.local"
         r = client.post(
             "/api/v1/auth/department/register",
             headers=_bearer(token),
@@ -472,12 +472,12 @@ class TestSeedAndMigration:
     def test_department_accounts_seeded(self, client):
         # Every one of the six departments must have a working login.
         for email, _name, code in [
-            ("security@vignan.ac.in", "", "SECURITY"),
-            ("medical@vignan.ac.in", "", "MEDICAL"),
-            ("transport@vignan.ac.in", "", "TRANSPORT"),
-            ("communication@vignan.ac.in", "", "COMMUNICATION"),
-            ("fire@vignan.ac.in", "", "FIRE"),
-            ("facilities@vignan.ac.in", "", "FACILITIES"),
+            ("security@aitam.local", "", "SECURITY"),
+            ("medical@aitam.local", "", "MEDICAL"),
+            ("transport@aitam.local", "", "TRANSPORT"),
+            ("communication@aitam.local", "", "COMMUNICATION"),
+            ("fire@aitam.local", "", "FIRE"),
+            ("facilities@aitam.local", "", "FACILITIES"),
         ]:
             token = _department_token(client, email, code)
             assert token

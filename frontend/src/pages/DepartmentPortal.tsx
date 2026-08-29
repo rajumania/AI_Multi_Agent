@@ -6,15 +6,18 @@ import { DepartmentAlert, DepartmentVoiceAlerts } from '../components/Department
 import { DepartmentAssignment, Incident, IncidentStatus, TransportTracking } from '../types';
 import { DepartmentCode, departmentLabel } from '../auth/roles';
 import { TransportResponseMap } from '../components/TransportResponseMap';
+import { OperationalDataPage, OperationalView } from './OperationalDataPage';
 
 // Per-department accent (purely cosmetic; keeps the six portals distinguishable).
 const DEPT_ACCENTS: Record<DepartmentCode, string> = {
+  SEARCH_AND_RESCUE: '#ea580c',
   SECURITY: '#6366f1',
   MEDICAL: '#dc2626',
   TRANSPORT: '#0891b2',
   COMMUNICATION: '#7c3aed',
   FIRE: '#ea580c',
   FACILITIES: '#0d9488',
+  SHELTER: '#7c3aed',
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -85,9 +88,10 @@ interface DepartmentPortalProps {
 // This is a responder FEED, not the operator command console: it shows the
 // operational detail a responding team needs (status, severity, location,
 // casualties, latest step) but exposes NO privileged command actions
-// (approve / dispatch / resolve remain operator-only in the command center).
+// (high-impact approval remains authenticated and department-scoped).
 // ---------------------------------------------------------------------------
 export const DepartmentPortal: React.FC<DepartmentPortalProps> = ({ department }) => {
+  const [operationsView, setOperationsView] = useState<'feed' | OperationalView>('feed');
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -189,6 +193,7 @@ export const DepartmentPortal: React.FC<DepartmentPortalProps> = ({ department }
     const connect = () => {
       if (disposed) return;
       socket = new WebSocket(appendWsToken(`${base}/api/v1/events/ws`));
+      socket.onopen = () => setNotificationRefreshKey((value) => value + 1);
       socket.onmessage = (message) => {
         try {
           const event = JSON.parse(message.data);
@@ -196,11 +201,14 @@ export const DepartmentPortal: React.FC<DepartmentPortalProps> = ({ department }
           const eventDepartment = String(event.department || '').toUpperCase();
           if (eventName === 'notification_created' && event.recipient_type === 'department' && eventDepartment === department) {
             setNotificationRefreshKey((value) => value + 1);
+            if (event.notification_id && socket?.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({ type: 'notification_delivered', notification_id: event.notification_id }));
+            }
             if (['critical', 'alert'].includes(String(event.level).toLowerCase())) {
               setUrgentAlert({ notificationId: event.notification_id, title: event.title || 'Department assignment received', message: event.message || 'Please review the new emergency assignment.', level: event.level || 'alert', incidentId: event.incident_id, department: eventDepartment });
             }
           }
-          if (['department_notified', 'dept_assignment_accepted', 'dept_assignment_declined', 'dept_team_assigned', 'dept_en_route', 'dept_on_scene', 'dept_assignment_completed', 'transport_location_updated', 'transport_route_created', 'transport_route_updated', 'transport_eta_updated', 'transport_arrived'].includes(eventName) && eventDepartment === department) {
+          if (['notification_delivered', 'notification_read', 'notification_failed', 'department_notified', 'dept_assignment_accepted', 'dept_assignment_declined', 'dept_team_assigned', 'dept_en_route', 'dept_on_scene', 'dept_assignment_completed', 'transport_location_updated', 'transport_route_created', 'transport_route_updated', 'transport_eta_updated', 'transport_arrived'].includes(eventName) && eventDepartment === department) {
             void fetchScoped();
           }
         } catch { /* malformed frames are ignored; polling remains active */ }
@@ -244,6 +252,11 @@ export const DepartmentPortal: React.FC<DepartmentPortalProps> = ({ department }
 
       <main className="department-portal-main" style={{ maxWidth: '1080px', margin: '0 auto', padding: '1.5rem 1rem 3rem' }}>
         <DepartmentVoiceAlerts alert={urgentAlert} onAcknowledge={acknowledgeAlert} />
+        <div className="panel-card" style={{ padding: '.7rem', marginBottom: '1rem', display: 'flex', gap: '.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <strong style={{ fontSize: '.78rem', color: '#334155', marginRight: '.25rem' }}>Department Command Center:</strong>
+          {([['feed', 'Incident Feed'], ['sensors', 'Sensors'], ['alerts', 'Alerts'], ['rescue', 'Rescue Requests'], ['shelters', 'Shelters & Hospitals'], ['monitoring', 'Monitoring']] as const).map(([key, label]) => <button key={key} type="button" className="btn btn-sm btn-outline" onClick={() => setOperationsView(key)} style={{ background: operationsView === key ? `${accent}15` : '#fff', borderColor: operationsView === key ? accent : '#cbd5e1', color: operationsView === key ? accent : '#475569' }}>{label}</button>)}
+        </div>
+        {operationsView !== 'feed' && <OperationalDataPage view={operationsView} />}
         {/* Overview strip */}
         <div
           style={{

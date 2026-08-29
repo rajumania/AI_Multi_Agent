@@ -1,4 +1,4 @@
-"""Authentication & authorization core for CampusFlow AI (Increment 1).
+"""Authentication & authorization core for AITAM Disaster Response AI (Increment 1).
 
 Centralizes everything security-related so both the auth API and the RBAC
 dependencies share one implementation:
@@ -14,10 +14,9 @@ Security model (Part 3 of the requirements):
   trusted — every protected endpoint resolves a Principal from the signed token
   and checks role + department + resource ownership server-side.
 
-NOTE on password hashing: we deliberately keep SHA-256 (unsalted) here for
-backward compatibility with already-seeded accounts (e.g. admin/password123).
-Upgrading to a salted KDF (bcrypt/argon2) is tracked as a follow-up; doing it
-now would lock out any existing on-disk DB whose plaintext we cannot recover.
+Password verification remains compatible with already-seeded accounts while
+newly created credentials use a salted, computationally expensive KDF. Legacy
+SHA-256 values are accepted only for migration compatibility.
 """
 
 from __future__ import annotations
@@ -26,6 +25,7 @@ import base64
 import hashlib
 import hmac
 import json
+import secrets
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
@@ -52,15 +52,42 @@ SUBJECT_DEPARTMENT = "department"  # department staff (email + password + dept)
 SUBJECT_OPERATOR = "operator"  # legacy command-center / admin (username + pwd)
 
 
+_PBKDF2_ITERATIONS = 310_000
+
+
 def hash_password(password: str) -> str:
-    """Hash a plaintext password (SHA-256, matching the existing scheme)."""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash new passwords with salted PBKDF2-SHA256.
+
+    Existing installations contain legacy unsalted SHA-256 hashes. Verification
+    remains backward compatible so a deployment can rotate credentials without
+    locking out the current operator/department accounts.
+    """
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", (password or "").encode(), salt, _PBKDF2_ITERATIONS)
+    encode = lambda value: base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
+    return f"pbkdf2_sha256${_PBKDF2_ITERATIONS}${encode(salt)}${encode(digest)}"
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Constant-time compare of a candidate password against a stored hash."""
-    candidate = hash_password(password or "")
-    return hmac.compare_digest(candidate, hashed or "")
+    """Verify PBKDF2 hashes and legacy SHA-256 hashes in constant time."""
+    stored = hashed or ""
+    if stored.startswith("pbkdf2_sha256$"):
+        try:
+            _, iterations_raw, salt_raw, digest_raw = stored.split("$", 3)
+            iterations = int(iterations_raw)
+            if iterations < 100_000 or iterations > 1_000_000:
+                return False
+            padding = "=" * (-len(salt_raw) % 4)
+            salt = base64.urlsafe_b64decode((salt_raw + padding).encode("ascii"))
+            padding = "=" * (-len(digest_raw) % 4)
+            expected = base64.urlsafe_b64decode((digest_raw + padding).encode("ascii"))
+            candidate = hashlib.pbkdf2_hmac("sha256", (password or "").encode(), salt, iterations)
+            return hmac.compare_digest(candidate, expected)
+        except (ValueError, TypeError, UnicodeError):
+            return False
+    # Backward-compatible verification only; all newly created accounts use
+    # the stronger format above.
+    return hmac.compare_digest(hashlib.sha256((password or "").encode()).hexdigest(), stored)
 
 
 def _secret() -> bytes:

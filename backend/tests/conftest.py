@@ -32,6 +32,12 @@ os.environ["ALLOW_ANONYMOUS_ADMIN"] = "false"
 # tests focused and deterministic; the Phase 7.3 background path has dedicated
 # tests that enable this setting explicitly.
 os.environ["AUTOMATIC_AI_WORKFLOW"] = "false"
+# Keep the isolated regression suite deterministic and network-free. Phase 9A
+# provider tests inject mocked clients directly; live provider verification is
+# performed separately against the configured runtime environment.
+os.environ["WEATHER_PROVIDER"] = "demo"
+os.environ["ENVIRONMENT_PROVIDER"] = "demo"
+os.environ["SENSOR_PROVIDER"] = "demo"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -40,7 +46,7 @@ from backend.config import settings  # noqa: E402
 from backend.database.database import engine, Base, SessionLocal  # noqa: E402
 from backend.database import models  # noqa: E402  (registers ORM tables on Base)
 from backend.database.migrate import ensure_schema  # noqa: E402
-from backend.database.seed import seed_resources, seed_users  # noqa: E402
+from backend.database.seed import seed_resources, seed_users, seed_disaster_domain  # noqa: E402
 from backend.main import app  # noqa: E402
 
 
@@ -56,6 +62,7 @@ def _prepare_database():
     db = SessionLocal()
     try:
         seed_resources(db)
+        seed_disaster_domain(db)
         seed_users(db)
     finally:
         db.close()
@@ -117,7 +124,7 @@ def department_token(client: TestClient, email: str, department: str) -> str:
 def citizen_token(client: TestClient) -> str:
     resp = client.post(
         "/api/v1/auth/user/login",
-        json={"email": "student@vignan.ac.in", "phone": "9000000000"},
+    json={"email": "community@aitam.local", "phone": "9000000000"},
     )
     assert resp.status_code == 200, resp.text
     return resp.json()["token"]

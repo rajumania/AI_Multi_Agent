@@ -43,7 +43,15 @@ class ConnectionManager:
         try:
             await websocket.send_json(message)
         except Exception:
-            pass
+            notification_id = message.get("notification_id")
+            if notification_id:
+                try:
+                    from backend.services.notification_service import mark_notification_failed
+                    scope = self.connection_scopes.get(websocket)
+                    if scope is not None:
+                        mark_notification_failed(notification_id, scope)
+                except Exception:
+                    pass
 
     async def broadcast(self, message: Dict[str, Any]):
         """Unfiltered broadcast (kept for backward compatibility)."""
@@ -88,8 +96,27 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket, scope)
     try:
         while True:
-            # Wait for any incoming messages or just keep the socket open
-            await websocket.receive_text()
+            # Clients acknowledge receipt only after a notification frame has
+            # reached the portal. The acknowledgement is authorization-scoped
+            # and updates the durable row; it is not trusted as a department
+            # identity claim.
+            raw = await websocket.receive_text()
+            try:
+                incoming = json.loads(raw)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if incoming.get("type") != "notification_delivered":
+                continue
+            notification_id = incoming.get("notification_id")
+            if isinstance(notification_id, bool):
+                continue
+            try:
+                notification_id = int(notification_id)
+            except (TypeError, ValueError):
+                continue
+            if notification_id > 0:
+                from backend.services.notification_service import mark_notification_delivered
+                mark_notification_delivered(notification_id, scope)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception:
@@ -186,6 +213,8 @@ EVENTS_TO_BROADCAST = [
     "approval_rejected",
     "dispatch_started",
     "response_dispatched",
+    "response_execution_started",
+    "response_execution_completed",
     "resource_dispatched",
     "vehicle_location_updated",
     "route_selected",
@@ -199,11 +228,15 @@ EVENTS_TO_BROADCAST = [
     "incident_resolved",
     "incident_closed",
     "trace_updated"
+    ,"event_fused"
+    ,"sensor_correlated"
     ,"provider_connected"
     ,"provider_failed"
     ,"notification_requested"
     ,"notification_accepted"
     ,"notification_delivered"
+    ,"notification_read"
+    ,"notification_failed"
     ,"notification_failed"
     ,"in_app_alert_available"
     ,"call_requested"
@@ -225,12 +258,25 @@ EVENTS_TO_BROADCAST = [
     ,"dept_on_scene"
     ,"dept_assignment_completed"
     ,"notification_created"
+    ,"department_tasks_dispatched"
     ,"transport_location_updated"
     ,"transport_route_created"
     ,"transport_route_updated"
     ,"transport_eta_updated"
     ,"transport_arrived"
     ,"road_condition_updated"
+    ,"risk_updated"
+    ,"early_warning_created"
+    ,"weather_updated"
+    ,"environment_updated"
+    ,"sensor_update"
+    ,"environment_anomaly"
+    ,"disaster_detected"
+    ,"community_alert"
+    ,"rescue_request_created"
+    ,"resource_updated"
+    ,"travel_risk_updated"
+    ,"replan_triggered"
 ]
 
 for event in EVENTS_TO_BROADCAST:

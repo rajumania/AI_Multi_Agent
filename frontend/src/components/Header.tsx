@@ -49,19 +49,19 @@ export const Header: React.FC<HeaderProps> = ({ health, loading, onRefresh, wsSt
           </div>
           <div className="brand-text">
             <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              CAMPUSFLOW AI
+              AITAM DISASTER RESPONSE AI
               <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '4px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa', fontWeight: 600 }}>
                 REAL-LIFE OPERATIONS MODE
               </span>
             </h1>
-            <div className="brand-subtitle">Vignan University (VFSTR) • Vadlamudi, Guntur, AP, India</div>
+            <div className="brand-subtitle">Aditya Institute of Technology and Management • Community Response Network</div>
           </div>
         </div>
 
         <div className="header-status-group" style={{ gap: '0.75rem' }}>
           <div className="operational-mode-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, padding: '0.4rem 0.75rem', borderRadius: '6px', background: '#0f172a', border: '1px solid #334155' }}>
             <Radio size={14} className="spin-pulse" style={{ color: '#f59e0b' }} />
-            <span>REAL-TIME CAMPUS EMERGENCY OPERATIONS • {modeText}</span>
+            <span>REAL-TIME DISASTER RESPONSE OPERATIONS • {modeText}</span>
           </div>
 
           <div

@@ -46,7 +46,7 @@ export const ExplainabilityCard: React.FC<ExplainabilityCardProps> = ({
       {isOpen && (
         <div style={{ marginTop: '0.65rem', borderTop: '1px solid #cbd5e1', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
           <p style={{ margin: '0 0 0.4rem', color: '#334155', lineHeight: 1.4 }}>
-            {explanation || `Evaluated by Deterministic Campus Safety Policy based on building density, active hazard keywords, and casualty risk metrics.`}
+            {explanation || `Evaluated by the deterministic emergency-safety policy using exposure, active hazard signals, and casualty-risk metrics.`}
           </p>
 
           {breakdown && breakdown.length > 0 && (

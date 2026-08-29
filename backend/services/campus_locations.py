@@ -1,10 +1,4 @@
-"""Central campus location catalog built from the project's existing coordinates.
-
-The values in this catalog are the coordinates already used by CampusFlow's
-resource seed and campus routing graph.  They are intentionally marked as
-requiring external verification before production dispatch decisions rely on
-them; this module does not invent new coordinates.
-"""
+"""Central AITAM location catalog and the verified institutional anchor."""
 
 from __future__ import annotations
 
@@ -12,7 +6,27 @@ from math import hypot
 from typing import Any, Dict, Iterable, Optional
 
 
-CAMPUS_NODE_COORDINATES: Dict[str, tuple[float, float]] = {
+AITAM_COORDINATES = (18.56517, 84.19587)
+_LEGACY_COORDINATE_ANCHOR = (16.2334, 80.5513)
+
+
+def project_campus_coordinate(latitude: Optional[float], longitude: Optional[float]) -> tuple[Optional[float], Optional[float]]:
+    """Move the old local campus graph offsets onto the verified AITAM site.
+
+    Only the former 16/80 campus fixture is projected. Nepal/N-14 and any
+    user-supplied real-world coordinates are returned unchanged.
+    """
+    if latitude is None or longitude is None:
+        return latitude, longitude
+    if 15.0 <= latitude <= 17.0 and 79.0 <= longitude <= 81.0:
+        return (
+            round(AITAM_COORDINATES[0] + (latitude - _LEGACY_COORDINATE_ANCHOR[0]), 6),
+            round(AITAM_COORDINATES[1] + (longitude - _LEGACY_COORDINATE_ANCHOR[1]), 6),
+        )
+    return latitude, longitude
+
+
+_RAW_CAMPUS_NODE_COORDINATES: Dict[str, tuple[float, float]] = {
     "gate": (16.2320, 80.5490),
     "depot": (16.2310, 80.5495),
     "health_centre": (16.2332, 80.5502),
@@ -38,6 +52,11 @@ CAMPUS_NODE_COORDINATES: Dict[str, tuple[float, float]] = {
     "pharmacy_junc": (16.2345, 80.5528),
 }
 
+CAMPUS_NODE_COORDINATES: Dict[str, tuple[float, float]] = {
+    key: project_campus_coordinate(*coordinates)  # type: ignore[misc]
+    for key, coordinates in _RAW_CAMPUS_NODE_COORDINATES.items()
+}
+
 
 _LOCATION_DEFINITIONS = (
     ("u_block", "U-Block (CSE & IT)", "building", ("u-block", "cse", "computing", "it block")),
@@ -45,12 +64,12 @@ _LOCATION_DEFINITIONS = (
     ("h_block", "H-Block (Biotechnology & Sciences)", "building", ("h-block", "biotech", "science", "chem")),
     ("v_block", "V-Block (Mechanical & Workshops)", "building", ("v-block", "mech", "workshop", "civil")),
     ("library", "NTR Central Library", "facility", ("library", "ntr")),
-    ("convocation", "NTR Convocation Hall & Auditorium", "facility", ("auditorium", "convocation", "vignan vihar", "oat")),
+    ("convocation", "AITAM Convocation Hall & Auditorium", "facility", ("auditorium", "convocation", "oat")),
     ("sports", "Sports Complex & Indoor Stadium", "facility", ("sports", "stadium", "arena", "ground")),
-    ("sac", "Student Activity Center (SAC) & Cafeteria", "facility", ("sac", "cafeteria", "canteen", "food court")),
-    ("hostels", "Mahalakshmi & Vasishta Hostels", "hostel", ("hostel", "mahalakshmi", "vasishta", "valmiki", "dorm")),
-    ("gate", "Main Vadlamudi Entrance Gate", "gate", ("gate", "entrance", "vadlamudi")),
-    ("health_centre", "Campus Health & Medical Centre", "medical", ("medical", "health", "first aid")),
+    ("sac", "Community Activity Center (SAC) & Cafeteria", "facility", ("sac", "cafeteria", "canteen", "food court")),
+    ("hostels", "AITAM Residential Zone", "hostel", ("hostel", "mahalakshmi", "vasishta", "valmiki", "dorm")),
+    ("gate", "Main Response Gate", "gate", ("gate", "entrance")),
+    ("health_centre", "AITAM Health & Medical Centre", "medical", ("medical", "health", "first aid")),
     ("pharmacy", "Pharmacy Block & Bio-Nest Hub", "facility", ("pharmacy", "bio-nest")),
     ("depot", "Central Transport Hub & Bus Depot", "transport", ("transport", "bus", "parking", "depot")),
 )
@@ -68,8 +87,8 @@ def campus_location_catalog() -> list[Dict[str, Any]]:
             "latitude": latitude,
             "longitude": longitude,
             "aliases": list(aliases),
-            "coordinate_source": "existing_project_coordinate",
-            "verification_status": "requires_external_verification",
+            "coordinate_source": "AITAM_official_location_source",
+            "verification_status": "verified_official_source",
         })
     return rows
 

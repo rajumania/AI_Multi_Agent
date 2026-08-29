@@ -342,7 +342,7 @@ export class VoiceAlertController {
     this.stoppedByOperator = false;
     this.cancelSpeech();
     this.updateState({ voiceState: 'MUTED' });
-    this.emitClientEvent('voice_alert_muted', 'Browser voice alert muted by operator.');
+    this.emitClientEvent('voice_alert_muted', 'Browser voice alert muted by the authorized commander.');
   }
 
   unmute() {
@@ -350,7 +350,7 @@ export class VoiceAlertController {
     this.muted = false;
     this.stoppedByOperator = false;
     this.updateState({ voiceState: 'IDLE', error: null });
-    this.emitClientEvent('voice_alert_unmuted', 'Browser voice alert unmuted by operator.');
+    this.emitClientEvent('voice_alert_unmuted', 'Browser voice alert unmuted by the authorized commander.');
     this.speakActiveIncident();
   }
 
@@ -367,7 +367,7 @@ export class VoiceAlertController {
     this.muted = false;
     this.cancelSpeech();
     if (incidentId) this.updateState({ voiceState: 'STOPPED' });
-    if (incidentId) this.emitClientEvent('voice_alert_stopped', 'Browser voice alert stopped by operator.', incidentId);
+    if (incidentId) this.emitClientEvent('voice_alert_stopped', 'Browser voice alert stopped by the authorized commander.', incidentId);
   }
 
   dispose() {

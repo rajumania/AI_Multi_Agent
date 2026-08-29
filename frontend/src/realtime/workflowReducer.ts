@@ -24,10 +24,9 @@
 
 import { LiveEvent } from '../types';
 
-// The eight REAL LangGraph nodes, in pipeline order. Labels mirror the backend
-// AGENT_META so ordering/labels are stable even before any event arrives. The
-// backend also sends `agent_label` on every agent event, which takes precedence
-// if present (keeps the two in sync without a hard dependency).
+// Compatibility order for the original incident graph. These keys remain
+// tracked because the backend still accepts that older event shape, but they
+// are no longer used by the 3D catalog.
 export const AGENT_ORDER = [
   'supervisor',
   'security',
@@ -39,10 +38,38 @@ export const AGENT_ORDER = [
   'synthesizer',
 ] as const;
 
-export type AgentKey = (typeof AGENT_ORDER)[number];
+// Nodes in the current disaster-intelligence graph. This is the order used for
+// current progress and labels; the 3D catalog renders these nodes.
+export const CURRENT_AGENT_ORDER = [
+  'supervisor',
+  'disaster_analysis',
+  'weather_analysis',
+  'risk_prediction',
+  'geo_vulnerability',
+  'hydrology_environmental',
+  'medical_triage',
+  'search_rescue',
+  'security_public_safety',
+  'infrastructure',
+  'shelter',
+  'hospital',
+  'communication',
+  'situation_state',
+  'resource',
+  'rescue_priority',
+  'routing',
+  'response_planner',
+  'approval_gate',
+  'monitoring',
+  'recovery',
+] as const;
 
-export const AGENT_LABELS: Record<AgentKey, string> = {
-  supervisor: 'Incident Intelligence Agent',
+// Agent keys are backend-defined strings so newly added current nodes can be
+// displayed from their real events without requiring a frontend release first.
+export type AgentKey = string;
+
+export const AGENT_LABELS: Record<string, string> = {
+  supervisor: 'Supervisor / Incident Commander',
   security: 'Security & Perimeter Agent',
   medical: 'Medical Response Agent',
   transport: 'Resource & Transport Agent',
@@ -50,6 +77,25 @@ export const AGENT_LABELS: Record<AgentKey, string> = {
   fire: 'Safety & Hazard Agent',
   facilities: 'Facilities & Infrastructure Agent',
   synthesizer: 'Response Planning Agent',
+  disaster_analysis: 'Disaster Analysis Agent',
+  weather_analysis: 'Weather Agent',
+  risk_prediction: 'Risk Prediction Agent',
+  geo_vulnerability: 'Geo Vulnerability Agent',
+  hydrology_environmental: 'Hydrology / Environment Agent',
+  medical_triage: 'Medical Triage Agent',
+  search_rescue: 'Search & Rescue Agent',
+  security_public_safety: 'Security / Public Safety Agent',
+  infrastructure: 'Infrastructure Agent',
+  shelter: 'Shelter Agent',
+  hospital: 'Hospital Agent',
+  situation_state: 'Situation State',
+  resource: 'Resource Coordination Agent',
+  rescue_priority: 'Rescue Priority Agent',
+  routing: 'Routing Agent',
+  response_planner: 'Response Planner Agent',
+  approval_gate: 'Human Approval Gate',
+  monitoring: 'Monitoring Agent',
+  recovery: 'Recovery Agent',
 };
 
 export type AgentRuntimeStatus = 'idle' | 'working' | 'completed' | 'failed';
@@ -186,6 +232,11 @@ export function derivePhase(incident: IncidentWorkflowState): WorkflowPhase {
     return 'awaiting_approval';
   }
 
+  const currentPlanner = incident.agents.response_planner;
+  if (currentPlanner && currentPlanner.status === 'completed') return 'planned';
+  if (currentPlanner && currentPlanner.status === 'working') return 'synthesizing';
+
+  // Compatibility fallback for events from the older incident graph.
   const synthesizer = incident.agents.synthesizer;
   if (synthesizer && synthesizer.status === 'completed') return 'planned';
   if (synthesizer && synthesizer.status === 'working') return 'synthesizing';
@@ -203,7 +254,11 @@ export function derivePhase(incident: IncidentWorkflowState): WorkflowPhase {
 // truthful progress signal — it counts nodes the backend actually finished, not
 // elapsed time — suitable for a progress ring in the 3D view.
 export function workflowProgress(incident: IncidentWorkflowState): number {
-  const known = AGENT_ORDER.map((k) => incident.agents[k]).filter(Boolean);
+  const currentHasActivity = CURRENT_AGENT_ORDER.some(
+    (key) => key !== 'supervisor' && incident.agents[key] && incident.agents[key].status !== 'idle',
+  );
+  const order = currentHasActivity ? CURRENT_AGENT_ORDER : AGENT_ORDER;
+  const known = order.map((k) => incident.agents[k]).filter(Boolean);
   if (known.length === 0) return 0;
   const done = known.filter((a) => a.status === 'completed').length;
   return done / known.length;

@@ -1,0 +1,448 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/Header.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=ab160a9a"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=ab160a9a"; const useEffect = __vite__cjsImport3_react["useEffect"]; const useState = __vite__cjsImport3_react["useState"];
+import { ShieldAlert, RefreshCw, Radio, CheckCircle, Circle, Menu } from "/node_modules/.vite/deps/lucide-react.js?v=ab160a9a";
+import { api } from "/src/services/api.ts?t=1787951368129";
+import { NotificationBell } from "/src/components/NotificationBell.tsx?t=1787951368129";
+export const Header = ({ health, loading, onRefresh, wsState = "OFFLINE", user, onLogout, notificationRefreshKey = 0, onOpenMenu }) => {
+  _s();
+  const isHealthy = health?.status === "healthy";
+  const [systemStatus, setSystemStatus] = useState(null);
+  const fetchStatus = async () => {
+    try {
+      const status = await api.getSystemStatus();
+      setSystemStatus(status);
+    } catch (e) {
+      console.error("Failed to fetch system status", e);
+    }
+  };
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 1e4);
+    return () => clearInterval(interval);
+  }, []);
+  const backendConnected = health?.status === "healthy" || systemStatus?.backend_status === "CONNECTED";
+  const modeText = backendConnected ? "BACKEND CONNECTED" : "BACKEND OFFLINE";
+  return /* @__PURE__ */ jsxDEV("header", { className: "app-header", style: { flexDirection: "column", gap: "0.5rem", paddingBottom: "0.5rem" }, children: [
+    /* @__PURE__ */ jsxDEV("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }, children: [
+      /* @__PURE__ */ jsxDEV("button", { type: "button", className: "mobile-menu-button", "aria-label": "Open navigation", onClick: onOpenMenu, children: /* @__PURE__ */ jsxDEV(Menu, { size: 20 }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+        lineNumber: 63,
+        columnNumber: 11
+      }, this) }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+        lineNumber: 62,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "brand-section", children: [
+        /* @__PURE__ */ jsxDEV("div", { className: "brand-logo-icon", children: /* @__PURE__ */ jsxDEV(ShieldAlert, { size: 24 }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 67,
+          columnNumber: 13
+        }, this) }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 66,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { className: "brand-text", children: [
+          /* @__PURE__ */ jsxDEV("h1", { style: { display: "flex", alignItems: "center", gap: "0.5rem" }, children: [
+            "AITAM DISASTER RESPONSE AI",
+            /* @__PURE__ */ jsxDEV("span", { style: { fontSize: "0.7rem", padding: "0.15rem 0.5rem", borderRadius: "4px", background: "rgba(59, 130, 246, 0.2)", border: "1px solid rgba(59, 130, 246, 0.4)", color: "#60a5fa", fontWeight: 600 }, children: "REAL-LIFE OPERATIONS MODE" }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+              lineNumber: 72,
+              columnNumber: 15
+            }, this)
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 70,
+            columnNumber: 13
+          }, this),
+          /* @__PURE__ */ jsxDEV("div", { className: "brand-subtitle", children: "Aditya Institute of Technology and Management • Community Response Network" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 76,
+            columnNumber: 13
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 69,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+        lineNumber: 65,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "header-status-group", style: { gap: "0.75rem" }, children: [
+        /* @__PURE__ */ jsxDEV("div", { className: "operational-mode-badge", style: { display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 700, padding: "0.4rem 0.75rem", borderRadius: "6px", background: "#0f172a", border: "1px solid #334155" }, children: [
+          /* @__PURE__ */ jsxDEV(Radio, { size: 14, className: "spin-pulse", style: { color: "#f59e0b" } }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 82,
+            columnNumber: 13
+          }, this),
+          /* @__PURE__ */ jsxDEV("span", { children: [
+            "REAL-TIME DISASTER RESPONSE OPERATIONS • ",
+            modeText
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 83,
+            columnNumber: 13
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 81,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV(
+          "div",
+          {
+            className: `status-badge ${loading ? "connecting" : isHealthy ? "healthy" : "degraded"}`,
+            children: [
+              /* @__PURE__ */ jsxDEV("span", { className: "pulse-dot" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+                lineNumber: 91,
+                columnNumber: 13
+              }, this),
+              /* @__PURE__ */ jsxDEV("span", { children: isHealthy ? "Backend Connected" : loading ? "Connecting" : "Backend Offline" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+                lineNumber: 92,
+                columnNumber: 17
+              }, this)
+            ]
+          },
+          void 0,
+          true,
+          {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 86,
+            columnNumber: 11
+          },
+          this
+        ),
+        /* @__PURE__ */ jsxDEV(
+          "button",
+          {
+            className: "btn btn-outline",
+            onClick: () => {
+              onRefresh();
+              fetchStatus();
+            },
+            title: "Refresh status",
+            style: { padding: "0.35rem 0.65rem" },
+            children: /* @__PURE__ */ jsxDEV(RefreshCw, { size: 14, className: loading ? "spin" : "" }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+              lineNumber: 101,
+              columnNumber: 13
+            }, this)
+          },
+          void 0,
+          false,
+          {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 95,
+            columnNumber: 11
+          },
+          this
+        ),
+        /* @__PURE__ */ jsxDEV(NotificationBell, { refreshKey: notificationRefreshKey }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 104,
+          columnNumber: 11
+        }, this),
+        user && /* @__PURE__ */ jsxDEV("div", { style: { display: "flex", alignItems: "center", gap: "0.75rem", borderLeft: "1px solid #334155", paddingLeft: "0.75rem" }, children: [
+          /* @__PURE__ */ jsxDEV("div", { style: { textAlign: "right" }, children: [
+            /* @__PURE__ */ jsxDEV("div", { style: { fontSize: "0.75rem", fontWeight: 700, color: "#ffffff" }, children: user.full_name || user.username || user.name }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+              lineNumber: 109,
+              columnNumber: 17
+            }, this),
+            /* @__PURE__ */ jsxDEV("div", { style: { fontSize: "0.62rem", color: "#64748b", textTransform: "uppercase", fontWeight: 600 }, children: user.role }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+              lineNumber: 110,
+              columnNumber: 17
+            }, this)
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 108,
+            columnNumber: 15
+          }, this),
+          /* @__PURE__ */ jsxDEV(
+            "button",
+            {
+              onClick: onLogout,
+              className: "btn btn-outline",
+              style: { fontSize: "0.68rem", padding: "0.25rem 0.5rem", color: "#f87171", borderColor: "rgba(239, 68, 68, 0.4)", background: "transparent", cursor: "pointer" },
+              children: "Sign Out"
+            },
+            void 0,
+            false,
+            {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+              lineNumber: 112,
+              columnNumber: 15
+            },
+            this
+          )
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 107,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+        lineNumber: 80,
+        columnNumber: 9
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+      lineNumber: 61,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "service-status-board", children: [
+      /* @__PURE__ */ jsxDEV("div", { children: [
+        /* @__PURE__ */ jsxDEV("strong", { children: "CORE SYSTEM" }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 125,
+          columnNumber: 14
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(CheckCircle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 125,
+            columnNumber: 48
+          }, this),
+          " Backend Connected"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 125,
+          columnNumber: 42
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(CheckCircle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 125,
+            columnNumber: 104
+          }, this),
+          " WebSocket ",
+          wsState
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 125,
+          columnNumber: 98
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(CheckCircle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 125,
+            columnNumber: 162
+          }, this),
+          " Database Connected"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 125,
+          columnNumber: 156
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(CheckCircle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 125,
+            columnNumber: 219
+          }, this),
+          " AI Agents Active"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 125,
+          columnNumber: 213
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(CheckCircle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 125,
+            columnNumber: 274
+          }, this),
+          " LangGraph Active"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 125,
+          columnNumber: 268
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(CheckCircle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 125,
+            columnNumber: 329
+          }, this),
+          " MCP Connected"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 125,
+          columnNumber: 323
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(CheckCircle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 125,
+            columnNumber: 381
+          }, this),
+          " Response Planning Active"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 125,
+          columnNumber: 375
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+        lineNumber: 125,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { children: [
+        /* @__PURE__ */ jsxDEV("strong", { children: "LOCAL DEVICE CAPABILITIES" }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 126,
+          columnNumber: 14
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(CheckCircle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 126,
+            columnNumber: 62
+          }, this),
+          " Browser Voice — Enable Audio"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 126,
+          columnNumber: 56
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(Circle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 126,
+            columnNumber: 129
+          }, this),
+          " GPS — Enable Live GPS"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 126,
+          columnNumber: 123
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(CheckCircle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 126,
+            columnNumber: 184
+          }, this),
+          " In-App Alert Ready"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 126,
+          columnNumber: 178
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+        lineNumber: 126,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "optional-services", children: [
+        /* @__PURE__ */ jsxDEV("strong", { children: "OPTIONAL EXTERNAL INTEGRATIONS" }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 127,
+          columnNumber: 44
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(Circle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 127,
+            columnNumber: 97
+          }, this),
+          " Email — Optional / Not Configured"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 127,
+          columnNumber: 91
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(Circle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 127,
+            columnNumber: 164
+          }, this),
+          " SMS — Optional / Not Configured"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 127,
+          columnNumber: 158
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(Circle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 127,
+            columnNumber: 229
+          }, this),
+          " Phone Call — Optional / Not Configured"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 127,
+          columnNumber: 223
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: [
+          /* @__PURE__ */ jsxDEV(Circle, { size: 11 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+            lineNumber: 127,
+            columnNumber: 301
+          }, this),
+          " Firebase FCM — Optional / Not Configured"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+          lineNumber: 127,
+          columnNumber: 295
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+        lineNumber: 127,
+        columnNumber: 9
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+      lineNumber: 124,
+      columnNumber: 7
+    }, this)
+  ] }, void 0, true, {
+    fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx",
+    lineNumber: 60,
+    columnNumber: 5
+  }, this);
+};
+_s(Header, "KRGRFuyZlRyS6PlHaLrWRDmwcUY=");
+_c = Header;
+var _c;
+$RefreshReg$(_c, "Header");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/Header.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QUFBQSxXQUFqVztBQUFBO0FBQUE7QUFBQTtBQUFBLGFBQXdXO0FBQUEsU0FIMVc7QUFBQTtBQUFBO0FBQUE7QUFBQSxXQUlBO0FBQUEsT0FwRUY7QUFBQTtBQUFBO0FBQUE7QUFBQSxTQXFFQTtBQUVKO0FBQUVLLEdBOUZXVCxRQUE2QjtBQUFBLEtBQTdCQTtBQUE2QixJQUFBaUQ7QUFBQSxhQUFBQSxJQUFBIiwibmFtZXMiOlsidXNlRWZmZWN0IiwidXNlU3RhdGUiLCJTaGllbGRBbGVydCIsIlJlZnJlc2hDdyIsIlJhZGlvIiwiQ2hlY2tDaXJjbGUiLCJDaXJjbGUiLCJNZW51IiwiYXBpIiwiTm90aWZpY2F0aW9uQmVsbCIsIkhlYWRlciIsImhlYWx0aCIsImxvYWRpbmciLCJvblJlZnJlc2giLCJ3c1N0YXRlIiwidXNlciIsIm9uTG9nb3V0Iiwibm90aWZpY2F0aW9uUmVmcmVzaEtleSIsIm9uT3Blbk1lbnUiLCJfcyIsImlzSGVhbHRoeSIsInN0YXR1cyIsInN5c3RlbVN0YXR1cyIsInNldFN5c3RlbVN0YXR1cyIsImZldGNoU3RhdHVzIiwiZ2V0U3lzdGVtU3RhdHVzIiwiZSIsImNvbnNvbGUiLCJlcnJvciIsImludGVydmFsIiwic2V0SW50ZXJ2YWwiLCJjbGVhckludGVydmFsIiwiYmFja2VuZENvbm5lY3RlZCIsImJhY2tlbmRfc3RhdHVzIiwibW9kZVRleHQiLCJmbGV4RGlyZWN0aW9uIiwiZ2FwIiwicGFkZGluZ0JvdHRvbSIsImRpc3BsYXkiLCJhbGlnbkl0ZW1zIiwianVzdGlmeUNvbnRlbnQiLCJ3aWR0aCIsImZvbnRTaXplIiwicGFkZGluZyIsImJvcmRlclJhZGl1cyIsImJhY2tncm91bmQiLCJib3JkZXIiLCJjb2xvciIsImZvbnRXZWlnaHQiLCJib3JkZXJMZWZ0IiwicGFkZGluZ0xlZnQiLCJ0ZXh0QWxpZ24iLCJmdWxsX25hbWUiLCJ1c2VybmFtZSIsIm5hbWUiLCJ0ZXh0VHJhbnNmb3JtIiwicm9sZSIsImJvcmRlckNvbG9yIiwiY3Vyc29yIiwiX2MiXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsiSGVhZGVyLnRzeCJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgUmVhY3QsIHsgdXNlRWZmZWN0LCB1c2VTdGF0ZSB9IGZyb20gJ3JlYWN0JztcclxuaW1wb3J0IHsgU2hpZWxkQWxlcnQsIFJlZnJlc2hDdywgUmFkaW8sIENoZWNrQ2lyY2xlLCBDaXJjbGUsIE1lbnUgfSBmcm9tICdsdWNpZGUtcmVhY3QnO1xuaW1wb3J0IHsgSGVhbHRoUmVzcG9uc2UgfSBmcm9tICcuLi90eXBlcyc7XHJcbmltcG9ydCB7IGFwaSB9IGZyb20gJy4uL3NlcnZpY2VzL2FwaSc7XG5pbXBvcnQgeyBOb3RpZmljYXRpb25CZWxsIH0gZnJvbSAnLi9Ob3RpZmljYXRpb25CZWxsJztcblxyXG5pbnRlcmZhY2UgSGVhZGVyUHJvcHMge1xyXG4gIGhlYWx0aDogSGVhbHRoUmVzcG9uc2UgfCBudWxsO1xyXG4gIGxvYWRpbmc6IGJvb2xlYW47XG4gIG9uUmVmcmVzaDogKCkgPT4gdm9pZDtcbiAgd3NTdGF0ZT86ICdDT05ORUNURUQnIHwgJ0NPTk5FQ1RJTkcnIHwgJ09GRkxJTkUnO1xuICB1c2VyPzogYW55O1xyXG4gIG9uTG9nb3V0PzogKCkgPT4gdm9pZDtcbiAgbm90aWZpY2F0aW9uUmVmcmVzaEtleT86IG51bWJlcjtcbiAgb25PcGVuTWVudT86ICgpID0+IHZvaWQ7XG59XG5cbmV4cG9ydCBjb25zdCBIZWFkZXI6IFJlYWN0LkZDPEhlYWRlclByb3BzPiA9ICh7IGhlYWx0aCwgbG9hZGluZywgb25SZWZyZXNoLCB3c1N0YXRlID0gJ09GRkxJTkUnLCB1c2VyLCBvbkxvZ291dCwgbm90aWZpY2F0aW9uUmVmcmVzaEtleSA9IDAsIG9uT3Blbk1lbnUgfSkgPT4ge1xuICBjb25zdCBpc0hlYWx0aHkgPSBoZWFsdGg/LnN0YXR1cyA9PT0gJ2hlYWx0aHknO1xyXG4gIGNvbnN0IFtzeXN0ZW1TdGF0dXMsIHNldFN5c3RlbVN0YXR1c10gPSB1c2VTdGF0ZTxhbnk+KG51bGwpO1xyXG5cclxuICBjb25zdCBmZXRjaFN0YXR1cyA9IGFzeW5jICgpID0+IHtcclxuICAgIHRyeSB7XHJcbiAgICAgIGNvbnN0IHN0YXR1cyA9IGF3YWl0IGFwaS5nZXRTeXN0ZW1TdGF0dXMoKTtcclxuICAgICAgc2V0U3lzdGVtU3RhdHVzKHN0YXR1cyk7XHJcbiAgICB9IGNhdGNoIChlKSB7XHJcbiAgICAgIGNvbnNvbGUuZXJyb3IoJ0ZhaWxlZCB0byBmZXRjaCBzeXN0ZW0gc3RhdHVzJywgZSk7XHJcbiAgICB9XHJcbiAgfTtcclxuXHJcbiAgdXNlRWZmZWN0KCgpID0+IHtcclxuICAgIGZldGNoU3RhdHVzKCk7XHJcbiAgICBjb25zdCBpbnRlcnZhbCA9IHNldEludGVydmFsKGZldGNoU3RhdHVzLCAxMDAwMCk7XHJcbiAgICByZXR1cm4gKCkgPT4gY2xlYXJJbnRlcnZhbChpbnRlcnZhbCk7XHJcbiAgfSwgW10pO1xyXG5cclxuICBjb25zdCBiYWNrZW5kQ29ubmVjdGVkID0gaGVhbHRoPy5zdGF0dXMgPT09ICdoZWFsdGh5JyB8fCBzeXN0ZW1TdGF0dXM/LmJhY2tlbmRfc3RhdHVzID09PSAnQ09OTkVDVEVEJztcbiAgY29uc3QgbW9kZVRleHQgPSBiYWNrZW5kQ29ubmVjdGVkID8gJ0JBQ0tFTkQgQ09OTkVDVEVEJyA6ICdCQUNLRU5EIE9GRkxJTkUnO1xuXHJcbiAgcmV0dXJuIChcclxuICAgIDxoZWFkZXIgY2xhc3NOYW1lPVwiYXBwLWhlYWRlclwiIHN0eWxlPXt7IGZsZXhEaXJlY3Rpb246ICdjb2x1bW4nLCBnYXA6ICcwLjVyZW0nLCBwYWRkaW5nQm90dG9tOiAnMC41cmVtJyB9fT5cclxuICAgICAgPGRpdiBzdHlsZT17eyBkaXNwbGF5OiAnZmxleCcsIGFsaWduSXRlbXM6ICdjZW50ZXInLCBqdXN0aWZ5Q29udGVudDogJ3NwYWNlLWJldHdlZW4nLCB3aWR0aDogJzEwMCUnIH19PlxuICAgICAgICA8YnV0dG9uIHR5cGU9XCJidXR0b25cIiBjbGFzc05hbWU9XCJtb2JpbGUtbWVudS1idXR0b25cIiBhcmlhLWxhYmVsPVwiT3BlbiBuYXZpZ2F0aW9uXCIgb25DbGljaz17b25PcGVuTWVudX0+XG4gICAgICAgICAgPE1lbnUgc2l6ZT17MjB9IC8+XG4gICAgICAgIDwvYnV0dG9uPlxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImJyYW5kLXNlY3Rpb25cIj5cbiAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImJyYW5kLWxvZ28taWNvblwiPlxyXG4gICAgICAgICAgICA8U2hpZWxkQWxlcnQgc2l6ZT17MjR9IC8+XHJcbiAgICAgICAgICA8L2Rpdj5cclxuICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwiYnJhbmQtdGV4dFwiPlxyXG4gICAgICAgICAgICA8aDEgc3R5bGU9e3sgZGlzcGxheTogJ2ZsZXgnLCBhbGlnbkl0ZW1zOiAnY2VudGVyJywgZ2FwOiAnMC41cmVtJyB9fT5cclxuICAgICAgICAgICAgICBBSVRBTSBESVNBU1RFUiBSRVNQT05TRSBBSVxuICAgICAgICAgICAgICA8c3BhbiBzdHlsZT17eyBmb250U2l6ZTogJzAuN3JlbScsIHBhZGRpbmc6ICcwLjE1cmVtIDAuNXJlbScsIGJvcmRlclJhZGl1czogJzRweCcsIGJhY2tncm91bmQ6ICdyZ2JhKDU5LCAxMzAsIDI0NiwgMC4yKScsIGJvcmRlcjogJzFweCBzb2xpZCByZ2JhKDU5LCAxMzAsIDI0NiwgMC40KScsIGNvbG9yOiAnIzYwYTVmYScsIGZvbnRXZWlnaHQ6IDYwMCB9fT5cclxuICAgICAgICAgICAgICAgIFJFQUwtTElGRSBPUEVSQVRJT05TIE1PREVcclxuICAgICAgICAgICAgICA8L3NwYW4+XHJcbiAgICAgICAgICAgIDwvaDE+XHJcbiAgICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwiYnJhbmQtc3VidGl0bGVcIj5BZGl0eWEgSW5zdGl0dXRlIG9mIFRlY2hub2xvZ3kgYW5kIE1hbmFnZW1lbnQg4oCiIENvbW11bml0eSBSZXNwb25zZSBOZXR3b3JrPC9kaXY+XG4gICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgPC9kaXY+XHJcblxyXG4gICAgICAgIDxkaXYgY2xhc3NOYW1lPVwiaGVhZGVyLXN0YXR1cy1ncm91cFwiIHN0eWxlPXt7IGdhcDogJzAuNzVyZW0nIH19PlxyXG4gICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJvcGVyYXRpb25hbC1tb2RlLWJhZGdlXCIgc3R5bGU9e3sgZGlzcGxheTogJ2ZsZXgnLCBhbGlnbkl0ZW1zOiAnY2VudGVyJywgZ2FwOiAnMC40cmVtJywgZm9udFdlaWdodDogNzAwLCBwYWRkaW5nOiAnMC40cmVtIDAuNzVyZW0nLCBib3JkZXJSYWRpdXM6ICc2cHgnLCBiYWNrZ3JvdW5kOiAnIzBmMTcyYScsIGJvcmRlcjogJzFweCBzb2xpZCAjMzM0MTU1JyB9fT5cclxuICAgICAgICAgICAgPFJhZGlvIHNpemU9ezE0fSBjbGFzc05hbWU9XCJzcGluLXB1bHNlXCIgc3R5bGU9e3sgY29sb3I6ICcjZjU5ZTBiJyB9fSAvPlxuICAgICAgICAgICAgPHNwYW4+UkVBTC1USU1FIERJU0FTVEVSIFJFU1BPTlNFIE9QRVJBVElPTlMg4oCiIHttb2RlVGV4dH08L3NwYW4+XG4gICAgICAgICAgPC9kaXY+XHJcblxyXG4gICAgICAgICAgPGRpdlxyXG4gICAgICAgICAgICBjbGFzc05hbWU9e2BzdGF0dXMtYmFkZ2UgJHtcclxuICAgICAgICAgICAgICBsb2FkaW5nID8gJ2Nvbm5lY3RpbmcnIDogaXNIZWFsdGh5ID8gJ2hlYWx0aHknIDogJ2RlZ3JhZGVkJ1xyXG4gICAgICAgICAgICB9YH1cclxuICAgICAgICAgID5cclxuICAgICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPVwicHVsc2UtZG90XCI+PC9zcGFuPlxyXG4gICAgICAgICAgICAgICAgPHNwYW4+e2lzSGVhbHRoeSA/ICdCYWNrZW5kIENvbm5lY3RlZCcgOiBsb2FkaW5nID8gJ0Nvbm5lY3RpbmcnIDogJ0JhY2tlbmQgT2ZmbGluZSd9PC9zcGFuPlxuICAgICAgICAgIDwvZGl2PlxyXG5cclxuICAgICAgICAgIDxidXR0b25cclxuICAgICAgICAgICAgY2xhc3NOYW1lPVwiYnRuIGJ0bi1vdXRsaW5lXCJcclxuICAgICAgICAgICAgb25DbGljaz17KCkgPT4geyBvblJlZnJlc2goKTsgZmV0Y2hTdGF0dXMoKTsgfX1cclxuICAgICAgICAgICAgdGl0bGU9XCJSZWZyZXNoIHN0YXR1c1wiXHJcbiAgICAgICAgICAgIHN0eWxlPXt7IHBhZGRpbmc6ICcwLjM1cmVtIDAuNjVyZW0nIH19XHJcbiAgICAgICAgICA+XHJcbiAgICAgICAgICAgIDxSZWZyZXNoQ3cgc2l6ZT17MTR9IGNsYXNzTmFtZT17bG9hZGluZyA/ICdzcGluJyA6ICcnfSAvPlxyXG4gICAgICAgICAgPC9idXR0b24+XG5cbiAgICAgICAgICA8Tm90aWZpY2F0aW9uQmVsbCByZWZyZXNoS2V5PXtub3RpZmljYXRpb25SZWZyZXNoS2V5fSAvPlxuXG4gICAgICAgICAge3VzZXIgJiYgKFxuICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBkaXNwbGF5OiAnZmxleCcsIGFsaWduSXRlbXM6ICdjZW50ZXInLCBnYXA6ICcwLjc1cmVtJywgYm9yZGVyTGVmdDogJzFweCBzb2xpZCAjMzM0MTU1JywgcGFkZGluZ0xlZnQ6ICcwLjc1cmVtJyB9fT5cclxuICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IHRleHRBbGlnbjogJ3JpZ2h0JyB9fT5cbiAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGZvbnRTaXplOiAnMC43NXJlbScsIGZvbnRXZWlnaHQ6IDcwMCwgY29sb3I6ICcjZmZmZmZmJyB9fT57dXNlci5mdWxsX25hbWUgfHwgdXNlci51c2VybmFtZSB8fCB1c2VyLm5hbWV9PC9kaXY+XG4gICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBmb250U2l6ZTogJzAuNjJyZW0nLCBjb2xvcjogJyM2NDc0OGInLCB0ZXh0VHJhbnNmb3JtOiAndXBwZXJjYXNlJywgZm9udFdlaWdodDogNjAwIH19Pnt1c2VyLnJvbGV9PC9kaXY+XHJcbiAgICAgICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgICAgICAgPGJ1dHRvbiBcclxuICAgICAgICAgICAgICAgIG9uQ2xpY2s9e29uTG9nb3V0fVxyXG4gICAgICAgICAgICAgICAgY2xhc3NOYW1lPVwiYnRuIGJ0bi1vdXRsaW5lXCJcclxuICAgICAgICAgICAgICAgIHN0eWxlPXt7IGZvbnRTaXplOiAnMC42OHJlbScsIHBhZGRpbmc6ICcwLjI1cmVtIDAuNXJlbScsIGNvbG9yOiAnI2Y4NzE3MScsIGJvcmRlckNvbG9yOiAncmdiYSgyMzksIDY4LCA2OCwgMC40KScsIGJhY2tncm91bmQ6ICd0cmFuc3BhcmVudCcsIGN1cnNvcjogJ3BvaW50ZXInIH19XHJcbiAgICAgICAgICAgICAgPlxyXG4gICAgICAgICAgICAgICAgU2lnbiBPdXRcclxuICAgICAgICAgICAgICA8L2J1dHRvbj5cclxuICAgICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgICApfVxyXG4gICAgICAgIDwvZGl2PlxyXG4gICAgICA8L2Rpdj5cclxuXHJcbiAgICAgIDxkaXYgY2xhc3NOYW1lPVwic2VydmljZS1zdGF0dXMtYm9hcmRcIj5cbiAgICAgICAgPGRpdj48c3Ryb25nPkNPUkUgU1lTVEVNPC9zdHJvbmc+PHNwYW4+PENoZWNrQ2lyY2xlIHNpemU9ezExfSAvPiBCYWNrZW5kIENvbm5lY3RlZDwvc3Bhbj48c3Bhbj48Q2hlY2tDaXJjbGUgc2l6ZT17MTF9IC8+IFdlYlNvY2tldCB7d3NTdGF0ZX08L3NwYW4+PHNwYW4+PENoZWNrQ2lyY2xlIHNpemU9ezExfSAvPiBEYXRhYmFzZSBDb25uZWN0ZWQ8L3NwYW4+PHNwYW4+PENoZWNrQ2lyY2xlIHNpemU9ezExfSAvPiBBSSBBZ2VudHMgQWN0aXZlPC9zcGFuPjxzcGFuPjxDaGVja0NpcmNsZSBzaXplPXsxMX0gLz4gTGFuZ0dyYXBoIEFjdGl2ZTwvc3Bhbj48c3Bhbj48Q2hlY2tDaXJjbGUgc2l6ZT17MTF9IC8+IE1DUCBDb25uZWN0ZWQ8L3NwYW4+PHNwYW4+PENoZWNrQ2lyY2xlIHNpemU9ezExfSAvPiBSZXNwb25zZSBQbGFubmluZyBBY3RpdmU8L3NwYW4+PC9kaXY+XG4gICAgICAgIDxkaXY+PHN0cm9uZz5MT0NBTCBERVZJQ0UgQ0FQQUJJTElUSUVTPC9zdHJvbmc+PHNwYW4+PENoZWNrQ2lyY2xlIHNpemU9ezExfSAvPiBCcm93c2VyIFZvaWNlIOKAlCBFbmFibGUgQXVkaW88L3NwYW4+PHNwYW4+PENpcmNsZSBzaXplPXsxMX0gLz4gR1BTIOKAlCBFbmFibGUgTGl2ZSBHUFM8L3NwYW4+PHNwYW4+PENoZWNrQ2lyY2xlIHNpemU9ezExfSAvPiBJbi1BcHAgQWxlcnQgUmVhZHk8L3NwYW4+PC9kaXY+XG4gICAgICAgIDxkaXYgY2xhc3NOYW1lPVwib3B0aW9uYWwtc2VydmljZXNcIj48c3Ryb25nPk9QVElPTkFMIEVYVEVSTkFMIElOVEVHUkFUSU9OUzwvc3Ryb25nPjxzcGFuPjxDaXJjbGUgc2l6ZT17MTF9IC8+IEVtYWlsIOKAlCBPcHRpb25hbCAvIE5vdCBDb25maWd1cmVkPC9zcGFuPjxzcGFuPjxDaXJjbGUgc2l6ZT17MTF9IC8+IFNNUyDigJQgT3B0aW9uYWwgLyBOb3QgQ29uZmlndXJlZDwvc3Bhbj48c3Bhbj48Q2lyY2xlIHNpemU9ezExfSAvPiBQaG9uZSBDYWxsIOKAlCBPcHRpb25hbCAvIE5vdCBDb25maWd1cmVkPC9zcGFuPjxzcGFuPjxDaXJjbGUgc2l6ZT17MTF9IC8+IEZpcmViYXNlIEZDTSDigJQgT3B0aW9uYWwgLyBOb3QgQ29uZmlndXJlZDwvc3Bhbj48L2Rpdj5cbiAgICAgIDwvZGl2PlxuICAgIDwvaGVhZGVyPlxyXG4gICk7XHJcbn07XHJcblxyXG4iXSwiZmlsZSI6IkM6L1VzZXJzL3JhanViL0Rvd25sb2Fkcy9nZW5haS9BSVRBTS9mcm9udGVuZC9zcmMvY29tcG9uZW50cy9IZWFkZXIudHN4In0=

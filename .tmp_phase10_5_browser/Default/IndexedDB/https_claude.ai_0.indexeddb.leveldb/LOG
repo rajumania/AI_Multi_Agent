@@ -1,0 +1,6 @@
+2026/08/29-06:09:10.627 9a5c Creating DB C:\Users\rajub\Downloads\genai\AITAM\.tmp_phase10_5_browser\Default\IndexedDB\https_claude.ai_0.indexeddb.leveldb since it was missing.
+2026/08/29-06:09:10.642 9a5c Reusing MANIFEST C:\Users\rajub\Downloads\genai\AITAM\.tmp_phase10_5_browser\Default\IndexedDB\https_claude.ai_0.indexeddb.leveldb/MANIFEST-000001
+2026/08/29-07:58:06.164 9a5c Level-0 table #5: started
+2026/08/29-07:58:06.169 9a5c Level-0 table #5: 1174 bytes OK
+2026/08/29-07:58:06.177 9a5c Delete type=0 #3
+2026/08/29-07:58:06.178 9a5c Manual compaction at level-0 from (begin) .. (end); will stop at (end)

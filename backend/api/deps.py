@@ -1,4 +1,4 @@
-"""FastAPI authentication & RBAC dependencies for CampusFlow AI (Increment 1).
+"""FastAPI authentication & RBAC dependencies for AITAM Disaster Response AI (Increment 1).
 
 These dependencies are the *backend* enforcement point for role-based access
 control. Endpoints declare what they require (an authenticated principal, a
@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.database.database import get_db
-from backend.database.models import UserDB, DepartmentUserDB
+from backend.database.models import UserDB, DepartmentUserDB, DepartmentDB
 from backend.services.auth_service import (
     Principal,
     PRIVILEGED_ROLES,
@@ -75,13 +75,19 @@ def _principal_from_claims(claims: dict, db: Session) -> Optional[Principal]:
             dept_user = db.query(DepartmentUserDB).filter(DepartmentUserDB.email == claims["email"]).first()
         if dept_user is None or (dept_user.status or "active") != "active":
             return None
+        department = normalize_department(dept_user.department)
+        if department is None:
+            return None
+        department_row = db.query(DepartmentDB).filter(DepartmentDB.code == department).first()
+        if department_row is not None and department_row.status != "active":
+            return None
         return Principal(
             subject_type=SUBJECT_DEPARTMENT,
             id=str(dept_user.id),
             role=dept_user.role or "department",
             email=dept_user.email,
             full_name=dept_user.full_name,
-            department=normalize_department(dept_user.department),
+            department=department,
             claims=claims,
         )
 
@@ -169,7 +175,7 @@ def get_command_principal(
             id="anonymous-operator",
             role=ROLE_OPERATOR,
             username="anonymous",
-            full_name="Campus Operator",
+            full_name="AITAM Response Commander",
             claims={"anonymous": True},
         )
     raise HTTPException(
@@ -177,6 +183,25 @@ def get_command_principal(
         detail="Authentication required.",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+
+def get_approval_viewer(
+    request: Request, db: Session = Depends(get_db)
+) -> Principal:
+    """Resolve a principal allowed to view approval work.
+
+    Command operators can see all pending plans. Department heads can see the
+    plans routed to their department (the endpoint applies that scope), while
+    community accounts never receive the command approval queue.
+    """
+    principal = get_optional_principal(request, db)
+    if principal is not None:
+        if principal.is_privileged or principal.is_department:
+            return principal
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Command approval access is not available to community accounts.")
+    if settings.ALLOW_ANONYMOUS_ADMIN:
+        return Principal(subject_type=SUBJECT_OPERATOR, id="anonymous-operator", role=ROLE_OPERATOR, username="anonymous", full_name="AITAM Response Commander", claims={"anonymous": True})
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.", headers={"WWW-Authenticate": "Bearer"})
 
 
 # --------------------------------------------------------------------------

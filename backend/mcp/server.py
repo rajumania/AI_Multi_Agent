@@ -1,5 +1,5 @@
 """
-CampusFlow AI - Model Context Protocol (MCP) Server
+AITAM Disaster Response AI - Model Context Protocol (MCP) Server
 Provides standard MCP tool registration, schema definitions, and invocation routing.
 """
 from typing import Dict, Any, List, Callable, Optional

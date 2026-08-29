@@ -16,7 +16,7 @@ def test_health_check(client):
     data = response.json()
     assert data["status"] == "healthy"
     assert data["database"] == "connected"
-    assert data["service"] == "CampusFlow AI"
+    assert data["service"] == "AITAM Disaster Response AI"
     assert "seeded_resources" in data
     assert data["seeded_resources"] > 0
     assert "timestamp" in data

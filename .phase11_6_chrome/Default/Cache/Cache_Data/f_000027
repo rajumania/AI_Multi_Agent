@@ -1,0 +1,303 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/RealOperationsControls.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=ab160a9a"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=ab160a9a"; const useEffect = __vite__cjsImport3_react["useEffect"]; const useRef = __vite__cjsImport3_react["useRef"]; const useState = __vite__cjsImport3_react["useState"];
+import { isEmergencyActive } from "/src/services/voiceAlertController.ts";
+export const RealOperationsControls = ({
+  incident,
+  voiceIncident = null,
+  audioState = "NOT_ENABLED",
+  voiceState = "IDLE",
+  voiceError = null,
+  onEnableAudio,
+  onMute,
+  onUnmute,
+  onReplay,
+  onStopVoice,
+  wsState = "OFFLINE",
+  demoPushVisible = false,
+  onGpsLocation
+}) => {
+  _s();
+  const [gpsMode, setGpsMode] = useState("OFFLINE");
+  const [gpsNotice, setGpsNotice] = useState(null);
+  const [lastPosition, setLastPosition] = useState(null);
+  const watchId = useRef(null);
+  useEffect(() => () => {
+    if (watchId.current !== null) navigator.geolocation?.clearWatch(watchId.current);
+  }, []);
+  const publishLocation = (location) => {
+    setLastPosition(location);
+    onGpsLocation?.(location);
+  };
+  const enableLiveGps = () => {
+    setGpsNotice(null);
+    if (!navigator.geolocation) {
+      setGpsMode("OFFLINE");
+      setGpsNotice("This browser cannot provide GPS. Exact device coordinates are unavailable.");
+      return;
+    }
+    if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
+    watchId.current = navigator.geolocation.watchPosition((position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      const location = { latitude, longitude, accuracy, timestamp: new Date(position.timestamp || Date.now()).toISOString(), source: "REAL" };
+      setGpsMode("LIVE");
+      publishLocation(location);
+      setGpsNotice("REAL browser GPS active. Transport telemetry is sent only from an assigned Transport resource map.");
+    }, (error) => {
+      setGpsMode("OFFLINE");
+      setGpsNotice(error.code === error.PERMISSION_DENIED ? "GPS permission was denied. Enable permission to share exact coordinates." : "Live GPS is unavailable. Exact device coordinates are unavailable.");
+    }, { enableHighAccuracy: true, maximumAge: 5e3, timeout: 15e3 });
+  };
+  const stopGps = () => {
+    if (watchId.current !== null) navigator.geolocation?.clearWatch(watchId.current);
+    watchId.current = null;
+    setGpsMode("OFFLINE");
+    setGpsNotice("GPS stopped by command user.");
+    onGpsLocation?.(null);
+  };
+  useEffect(() => {
+    if (!incident) {
+      if (watchId.current !== null) navigator.geolocation?.clearWatch(watchId.current);
+      watchId.current = null;
+      setGpsMode("OFFLINE");
+      onGpsLocation?.(null);
+    }
+  }, [incident?.incident_id]);
+  const active = isEmergencyActive(incident);
+  const voiceDisplayIncident = incident || voiceIncident;
+  const hasVoiceStatus = Boolean(voiceDisplayIncident) && (active || voiceState === "STOPPED" || voiceState === "MUTED");
+  const voiceStatusLabel = audioState === "BLOCKED" ? "AUDIO BLOCKED" : voiceState === "STOPPED" ? "INCIDENT RESOLVED — VOICE ALERT STOPPED" : voiceState === "MUTED" ? "VOICE ALERT MUTED" : voiceState === "ACTIVE" ? "EMERGENCY VOICE ACTIVE" : audioState === "READY" ? "VOICE ALERT READY" : "VOICE ALERT WAITING FOR AUDIO";
+  return /* @__PURE__ */ jsxDEV("section", { className: "panel-card operations-panel", style: { marginBottom: "1rem" }, children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "panel-header", children: [
+      /* @__PURE__ */ jsxDEV("div", { className: "panel-title", children: "REAL-TIME DEVICE CAPABILITIES" }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+        lineNumber: 135,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("span", { className: "panel-tag", children: "LOCAL BROWSER CAPABILITIES • EXTERNAL PROVIDERS OPTIONAL" }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+        lineNumber: 136,
+        columnNumber: 9
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+      lineNumber: 134,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV("div", { className: "panel-body", style: { display: "grid", gap: "0.75rem" }, children: [
+      /* @__PURE__ */ jsxDEV("div", { className: "ops-status-grid", children: [
+        /* @__PURE__ */ jsxDEV("span", { className: `ops-status ${audioState === "READY" ? "real" : "offline"}`, children: [
+          "AUDIO: ",
+          audioState === "READY" ? "READY" : audioState.replace("_", " ")
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 140,
+          columnNumber: 11
+        }, this),
+        audioState !== "READY" && /* @__PURE__ */ jsxDEV("button", { className: "btn btn-danger", onClick: onEnableAudio, disabled: audioState === "INITIALIZING", children: audioState === "INITIALIZING" ? "INITIALIZING AUDIO..." : "ENABLE AUDIO" }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 141,
+          columnNumber: 38
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { className: `ops-status ${gpsMode === "OFFLINE" ? "offline" : "real"}`, children: [
+          "GPS: ",
+          gpsMode
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 142,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { className: `ops-status ${wsState === "CONNECTED" ? "real" : "offline"}`, children: [
+          "WEBSOCKET: ",
+          wsState
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 143,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { className: "ops-status real", children: [
+          "IN-APP ALERT: ",
+          demoPushVisible ? "ACTIVE" : "READY"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 144,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+        lineNumber: 139,
+        columnNumber: 9
+      }, this),
+      hasVoiceStatus && /* @__PURE__ */ jsxDEV("div", { className: "voice-alert-strip", role: "status", children: [
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("strong", { children: voiceStatusLabel }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 150,
+            columnNumber: 15
+          }, this),
+          /* @__PURE__ */ jsxDEV("small", { children: "REAL browser speaker • repeats while this emergency is active" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 151,
+            columnNumber: 15
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 149,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { className: "quick-actions-group", children: [
+          audioState !== "READY" && /* @__PURE__ */ jsxDEV("button", { className: "btn btn-danger", onClick: onEnableAudio, disabled: audioState === "INITIALIZING", children: "ENABLE AUDIO" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 154,
+            columnNumber: 42
+          }, this),
+          active && voiceState !== "MUTED" && /* @__PURE__ */ jsxDEV("button", { className: "btn btn-outline", onClick: onMute, children: "MUTE" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 155,
+            columnNumber: 52
+          }, this),
+          active && voiceState === "MUTED" && /* @__PURE__ */ jsxDEV("button", { className: "btn btn-outline", onClick: onUnmute, children: "UNMUTE" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 156,
+            columnNumber: 52
+          }, this),
+          active && /* @__PURE__ */ jsxDEV("button", { className: "btn btn-outline", onClick: onReplay, children: "REPLAY" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 157,
+            columnNumber: 26
+          }, this),
+          active && /* @__PURE__ */ jsxDEV("button", { className: "btn btn-danger", onClick: onStopVoice, children: "STOP ALERT" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 158,
+            columnNumber: 26
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 153,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+        lineNumber: 148,
+        columnNumber: 9
+      }, this),
+      voiceError && /* @__PURE__ */ jsxDEV("small", { role: "status", style: { color: "#b91c1c" }, children: voiceError }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+        lineNumber: 162,
+        columnNumber: 24
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "gps-control-row", children: [
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("strong", { children: [
+            "GPS: ",
+            gpsMode
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 166,
+            columnNumber: 13
+          }, this),
+          lastPosition && /* @__PURE__ */ jsxDEV("small", { children: [
+            "REAL DEVICE • ",
+            lastPosition.latitude.toFixed(6),
+            ", ",
+            lastPosition.longitude.toFixed(6),
+            " • ",
+            new Date(lastPosition.timestamp).toLocaleTimeString()
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 167,
+            columnNumber: 30
+          }, this),
+          gpsNotice && /* @__PURE__ */ jsxDEV("small", { children: gpsNotice }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 168,
+            columnNumber: 27
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 165,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { className: "quick-actions-group", children: [
+          /* @__PURE__ */ jsxDEV("button", { className: "btn btn-outline", onClick: enableLiveGps, children: "ENABLE LIVE GPS" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 171,
+            columnNumber: 13
+          }, this),
+          /* @__PURE__ */ jsxDEV("button", { className: "btn btn-outline", onClick: stopGps, disabled: gpsMode === "OFFLINE", children: "STOP GPS" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+            lineNumber: 172,
+            columnNumber: 13
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 170,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+        lineNumber: 164,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "ops-integrations-note", children: [
+        /* @__PURE__ */ jsxDEV("span", { children: "OPTIONAL EXTERNAL INTEGRATIONS" }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 177,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("span", { children: "AUTHENTICATED IN-APP WEBSOCKET ONLY" }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+          lineNumber: 178,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+        lineNumber: 176,
+        columnNumber: 9
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+      lineNumber: 138,
+      columnNumber: 7
+    }, this)
+  ] }, void 0, true, {
+    fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx",
+    lineNumber: 133,
+    columnNumber: 5
+  }, this);
+};
+_s(RealOperationsControls, "nK+yUySYmoeWQo+DzrXvegpHGmE=");
+_c = RealOperationsControls;
+var _c;
+$RefreshReg$(_c, "RealOperationsControls");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/RealOperationsControls.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QSwrQkFBQyxVQUFLLDhDQUFOO0FBQUE7QUFBQTtBQUFBO0FBQUEsZUFBb0M7QUFBQSxRQUNwQyx1QkFBQyxVQUFLLG1EQUFOO0FBQUE7QUFBQTtBQUFBO0FBQUEsZUFBeUM7QUFBQSxXQUYzQztBQUFBO0FBQUE7QUFBQTtBQUFBLGFBR0E7QUFBQSxTQXpDRjtBQUFBO0FBQUE7QUFBQTtBQUFBLFdBMENBO0FBQUEsT0EvQ0Y7QUFBQTtBQUFBO0FBQUE7QUFBQSxTQWdEQTtBQUVKO0FBQUVELEdBdklXZCx3QkFBNkQ7QUFBQSxLQUE3REE7QUFBNkQsSUFBQTREO0FBQUEsYUFBQUEsSUFBQSIsIm5hbWVzIjpbInVzZUVmZmVjdCIsInVzZVJlZiIsInVzZVN0YXRlIiwiaXNFbWVyZ2VuY3lBY3RpdmUiLCJSZWFsT3BlcmF0aW9uc0NvbnRyb2xzIiwiaW5jaWRlbnQiLCJ2b2ljZUluY2lkZW50IiwiYXVkaW9TdGF0ZSIsInZvaWNlU3RhdGUiLCJ2b2ljZUVycm9yIiwib25FbmFibGVBdWRpbyIsIm9uTXV0ZSIsIm9uVW5tdXRlIiwib25SZXBsYXkiLCJvblN0b3BWb2ljZSIsIndzU3RhdGUiLCJkZW1vUHVzaFZpc2libGUiLCJvbkdwc0xvY2F0aW9uIiwiX3MiLCJncHNNb2RlIiwic2V0R3BzTW9kZSIsImdwc05vdGljZSIsInNldEdwc05vdGljZSIsImxhc3RQb3NpdGlvbiIsInNldExhc3RQb3NpdGlvbiIsIndhdGNoSWQiLCJjdXJyZW50IiwibmF2aWdhdG9yIiwiZ2VvbG9jYXRpb24iLCJjbGVhcldhdGNoIiwicHVibGlzaExvY2F0aW9uIiwibG9jYXRpb24iLCJlbmFibGVMaXZlR3BzIiwid2F0Y2hQb3NpdGlvbiIsInBvc2l0aW9uIiwibGF0aXR1ZGUiLCJsb25naXR1ZGUiLCJhY2N1cmFjeSIsImNvb3JkcyIsInRpbWVzdGFtcCIsIkRhdGUiLCJub3ciLCJ0b0lTT1N0cmluZyIsInNvdXJjZSIsImVycm9yIiwiY29kZSIsIlBFUk1JU1NJT05fREVOSUVEIiwiZW5hYmxlSGlnaEFjY3VyYWN5IiwibWF4aW11bUFnZSIsInRpbWVvdXQiLCJzdG9wR3BzIiwiaW5jaWRlbnRfaWQiLCJhY3RpdmUiLCJ2b2ljZURpc3BsYXlJbmNpZGVudCIsImhhc1ZvaWNlU3RhdHVzIiwiQm9vbGVhbiIsInZvaWNlU3RhdHVzTGFiZWwiLCJtYXJnaW5Cb3R0b20iLCJkaXNwbGF5IiwiZ2FwIiwicmVwbGFjZSIsImNvbG9yIiwidG9GaXhlZCIsInRvTG9jYWxlVGltZVN0cmluZyIsIl9jIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIlJlYWxPcGVyYXRpb25zQ29udHJvbHMudHN4Il0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCBSZWFjdCwgeyB1c2VFZmZlY3QsIHVzZVJlZiwgdXNlU3RhdGUgfSBmcm9tICdyZWFjdCc7XG5pbXBvcnQgeyBJbmNpZGVudCB9IGZyb20gJy4uL3R5cGVzJztcbmltcG9ydCB7IEF1ZGlvQ2FwYWJpbGl0eVN0YXRlLCBpc0VtZXJnZW5jeUFjdGl2ZSwgVm9pY2VBbGVydFN0YXRlIH0gZnJvbSAnLi4vc2VydmljZXMvdm9pY2VBbGVydENvbnRyb2xsZXInO1xuXG5leHBvcnQgaW50ZXJmYWNlIE9wZXJhdG9yTG9jYXRpb24ge1xuICBsYXRpdHVkZTogbnVtYmVyO1xuICBsb25naXR1ZGU6IG51bWJlcjtcbiAgYWNjdXJhY3k/OiBudW1iZXI7XG4gIHRpbWVzdGFtcDogc3RyaW5nO1xuICBzb3VyY2U6ICdSRUFMJztcbn1cblxuaW50ZXJmYWNlIFJlYWxPcGVyYXRpb25zQ29udHJvbHNQcm9wcyB7XG4gIGluY2lkZW50PzogSW5jaWRlbnQ7XG4gIHZvaWNlSW5jaWRlbnQ/OiBJbmNpZGVudCB8IG51bGw7XG4gIGF1ZGlvU3RhdGU/OiBBdWRpb0NhcGFiaWxpdHlTdGF0ZTtcbiAgdm9pY2VTdGF0ZT86IFZvaWNlQWxlcnRTdGF0ZTtcbiAgdm9pY2VFcnJvcj86IHN0cmluZyB8IG51bGw7XG4gIG9uRW5hYmxlQXVkaW8/OiAoKSA9PiB2b2lkO1xuICBvbk11dGU/OiAoKSA9PiB2b2lkO1xuICBvblVubXV0ZT86ICgpID0+IHZvaWQ7XG4gIG9uUmVwbGF5PzogKCkgPT4gdm9pZDtcbiAgb25TdG9wVm9pY2U/OiAoKSA9PiB2b2lkO1xuICB3c1N0YXRlPzogJ0NPTk5FQ1RFRCcgfCAnQ09OTkVDVElORycgfCAnT0ZGTElORSc7XG4gIGRlbW9QdXNoVmlzaWJsZT86IGJvb2xlYW47XG4gIG9uR3BzTG9jYXRpb24/OiAobG9jYXRpb246IE9wZXJhdG9yTG9jYXRpb24gfCBudWxsKSA9PiB2b2lkO1xufVxuXG5leHBvcnQgY29uc3QgUmVhbE9wZXJhdGlvbnNDb250cm9sczogUmVhY3QuRkM8UmVhbE9wZXJhdGlvbnNDb250cm9sc1Byb3BzPiA9ICh7XG4gIGluY2lkZW50LFxuICB2b2ljZUluY2lkZW50ID0gbnVsbCxcbiAgYXVkaW9TdGF0ZSA9ICdOT1RfRU5BQkxFRCcsXG4gIHZvaWNlU3RhdGUgPSAnSURMRScsXG4gIHZvaWNlRXJyb3IgPSBudWxsLFxuICBvbkVuYWJsZUF1ZGlvLFxuICBvbk11dGUsXG4gIG9uVW5tdXRlLFxuICBvblJlcGxheSxcbiAgb25TdG9wVm9pY2UsXG4gIHdzU3RhdGUgPSAnT0ZGTElORScsXG4gIGRlbW9QdXNoVmlzaWJsZSA9IGZhbHNlLFxuICBvbkdwc0xvY2F0aW9uLFxufSkgPT4ge1xuICBjb25zdCBbZ3BzTW9kZSwgc2V0R3BzTW9kZV0gPSB1c2VTdGF0ZTwnTElWRScgfCAnT0ZGTElORSc+KCdPRkZMSU5FJyk7XG4gIGNvbnN0IFtncHNOb3RpY2UsIHNldEdwc05vdGljZV0gPSB1c2VTdGF0ZTxzdHJpbmcgfCBudWxsPihudWxsKTtcbiAgY29uc3QgW2xhc3RQb3NpdGlvbiwgc2V0TGFzdFBvc2l0aW9uXSA9IHVzZVN0YXRlPE9wZXJhdG9yTG9jYXRpb24gfCBudWxsPihudWxsKTtcblxuICBjb25zdCB3YXRjaElkID0gdXNlUmVmPG51bWJlciB8IG51bGw+KG51bGwpO1xuXG4gIHVzZUVmZmVjdCgoKSA9PiAoKSA9PiB7XG4gICAgaWYgKHdhdGNoSWQuY3VycmVudCAhPT0gbnVsbCkgbmF2aWdhdG9yLmdlb2xvY2F0aW9uPy5jbGVhcldhdGNoKHdhdGNoSWQuY3VycmVudCk7XG4gIH0sIFtdKTtcblxuICBjb25zdCBwdWJsaXNoTG9jYXRpb24gPSAobG9jYXRpb246IE9wZXJhdG9yTG9jYXRpb24pID0+IHtcbiAgICBzZXRMYXN0UG9zaXRpb24obG9jYXRpb24pO1xuICAgIG9uR3BzTG9jYXRpb24/Lihsb2NhdGlvbik7XG4gIH07XG5cbiAgY29uc3QgZW5hYmxlTGl2ZUdwcyA9ICgpID0+IHtcbiAgICBzZXRHcHNOb3RpY2UobnVsbCk7XG4gICAgaWYgKCFuYXZpZ2F0b3IuZ2VvbG9jYXRpb24pIHtcbiAgICAgIHNldEdwc01vZGUoJ09GRkxJTkUnKTtcbiAgICAgIHNldEdwc05vdGljZSgnVGhpcyBicm93c2VyIGNhbm5vdCBwcm92aWRlIEdQUy4gRXhhY3QgZGV2aWNlIGNvb3JkaW5hdGVzIGFyZSB1bmF2YWlsYWJsZS4nKTtcbiAgICAgIHJldHVybjtcbiAgICB9XG4gICAgaWYgKHdhdGNoSWQuY3VycmVudCAhPT0gbnVsbCkgbmF2aWdhdG9yLmdlb2xvY2F0aW9uLmNsZWFyV2F0Y2god2F0Y2hJZC5jdXJyZW50KTtcbiAgICB3YXRjaElkLmN1cnJlbnQgPSBuYXZpZ2F0b3IuZ2VvbG9jYXRpb24ud2F0Y2hQb3NpdGlvbigocG9zaXRpb24pID0+IHtcbiAgICAgIGNvbnN0IHsgbGF0aXR1ZGUsIGxvbmdpdHVkZSwgYWNjdXJhY3kgfSA9IHBvc2l0aW9uLmNvb3JkcztcbiAgICAgIGNvbnN0IGxvY2F0aW9uOiBPcGVyYXRvckxvY2F0aW9uID0geyBsYXRpdHVkZSwgbG9uZ2l0dWRlLCBhY2N1cmFjeSwgdGltZXN0YW1wOiBuZXcgRGF0ZShwb3NpdGlvbi50aW1lc3RhbXAgfHwgRGF0ZS5ub3coKSkudG9JU09TdHJpbmcoKSwgc291cmNlOiAnUkVBTCcgfTtcbiAgICAgIHNldEdwc01vZGUoJ0xJVkUnKTtcbiAgICAgIHB1Ymxpc2hMb2NhdGlvbihsb2NhdGlvbik7XG4gICAgICBzZXRHcHNOb3RpY2UoJ1JFQUwgYnJvd3NlciBHUFMgYWN0aXZlLiBUcmFuc3BvcnQgdGVsZW1ldHJ5IGlzIHNlbnQgb25seSBmcm9tIGFuIGFzc2lnbmVkIFRyYW5zcG9ydCByZXNvdXJjZSBtYXAuJyk7XG4gICAgfSwgKGVycm9yKSA9PiB7XG4gICAgICBzZXRHcHNNb2RlKCdPRkZMSU5FJyk7XG4gICAgICBzZXRHcHNOb3RpY2UoZXJyb3IuY29kZSA9PT0gZXJyb3IuUEVSTUlTU0lPTl9ERU5JRURcbiAgICAgICAgPyAnR1BTIHBlcm1pc3Npb24gd2FzIGRlbmllZC4gRW5hYmxlIHBlcm1pc3Npb24gdG8gc2hhcmUgZXhhY3QgY29vcmRpbmF0ZXMuJ1xuICAgICAgICA6ICdMaXZlIEdQUyBpcyB1bmF2YWlsYWJsZS4gRXhhY3QgZGV2aWNlIGNvb3JkaW5hdGVzIGFyZSB1bmF2YWlsYWJsZS4nKTtcbiAgICB9LCB7IGVuYWJsZUhpZ2hBY2N1cmFjeTogdHJ1ZSwgbWF4aW11bUFnZTogNTAwMCwgdGltZW91dDogMTUwMDAgfSk7XG4gIH07XG5cbiAgY29uc3Qgc3RvcEdwcyA9ICgpID0+IHtcbiAgICBpZiAod2F0Y2hJZC5jdXJyZW50ICE9PSBudWxsKSBuYXZpZ2F0b3IuZ2VvbG9jYXRpb24/LmNsZWFyV2F0Y2god2F0Y2hJZC5jdXJyZW50KTtcbiAgICB3YXRjaElkLmN1cnJlbnQgPSBudWxsO1xuICAgIHNldEdwc01vZGUoJ09GRkxJTkUnKTtcbiAgICBzZXRHcHNOb3RpY2UoJ0dQUyBzdG9wcGVkIGJ5IGNvbW1hbmQgdXNlci4nKTtcbiAgICBvbkdwc0xvY2F0aW9uPy4obnVsbCk7XG4gIH07XG5cbiAgdXNlRWZmZWN0KCgpID0+IHtcbiAgICBpZiAoIWluY2lkZW50KSB7XG4gICAgICBpZiAod2F0Y2hJZC5jdXJyZW50ICE9PSBudWxsKSBuYXZpZ2F0b3IuZ2VvbG9jYXRpb24/LmNsZWFyV2F0Y2god2F0Y2hJZC5jdXJyZW50KTtcbiAgICAgIHdhdGNoSWQuY3VycmVudCA9IG51bGw7XG4gICAgICBzZXRHcHNNb2RlKCdPRkZMSU5FJyk7XG4gICAgICBvbkdwc0xvY2F0aW9uPy4obnVsbCk7XG4gICAgfVxuICB9LCBbaW5jaWRlbnQ/LmluY2lkZW50X2lkXSk7XG5cbiAgY29uc3QgYWN0aXZlID0gaXNFbWVyZ2VuY3lBY3RpdmUoaW5jaWRlbnQpO1xuICBjb25zdCB2b2ljZURpc3BsYXlJbmNpZGVudCA9IGluY2lkZW50IHx8IHZvaWNlSW5jaWRlbnQ7XG4gIGNvbnN0IGhhc1ZvaWNlU3RhdHVzID0gQm9vbGVhbih2b2ljZURpc3BsYXlJbmNpZGVudCkgJiYgKGFjdGl2ZSB8fCB2b2ljZVN0YXRlID09PSAnU1RPUFBFRCcgfHwgdm9pY2VTdGF0ZSA9PT0gJ01VVEVEJyk7XG4gIGNvbnN0IHZvaWNlU3RhdHVzTGFiZWwgPSBhdWRpb1N0YXRlID09PSAnQkxPQ0tFRCdcbiAgICA/ICdBVURJTyBCTE9DS0VEJ1xuICAgIDogdm9pY2VTdGF0ZSA9PT0gJ1NUT1BQRUQnXG4gICAgICA/ICdJTkNJREVOVCBSRVNPTFZFRCDigJQgVk9JQ0UgQUxFUlQgU1RPUFBFRCdcbiAgICAgIDogdm9pY2VTdGF0ZSA9PT0gJ01VVEVEJ1xuICAgICAgICA/ICdWT0lDRSBBTEVSVCBNVVRFRCdcbiAgICAgICAgOiB2b2ljZVN0YXRlID09PSAnQUNUSVZFJ1xuICAgICAgICAgID8gJ0VNRVJHRU5DWSBWT0lDRSBBQ1RJVkUnXG4gICAgICAgICAgOiBhdWRpb1N0YXRlID09PSAnUkVBRFknXG4gICAgICAgICAgICA/ICdWT0lDRSBBTEVSVCBSRUFEWSdcbiAgICAgICAgICAgIDogJ1ZPSUNFIEFMRVJUIFdBSVRJTkcgRk9SIEFVRElPJztcblxuICByZXR1cm4gKFxuICAgIDxzZWN0aW9uIGNsYXNzTmFtZT1cInBhbmVsLWNhcmQgb3BlcmF0aW9ucy1wYW5lbFwiIHN0eWxlPXt7IG1hcmdpbkJvdHRvbTogJzFyZW0nIH19PlxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJwYW5lbC1oZWFkZXJcIj5cbiAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJwYW5lbC10aXRsZVwiPlJFQUwtVElNRSBERVZJQ0UgQ0FQQUJJTElUSUVTPC9kaXY+XG4gICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cInBhbmVsLXRhZ1wiPkxPQ0FMIEJST1dTRVIgQ0FQQUJJTElUSUVTIOKAoiBFWFRFUk5BTCBQUk9WSURFUlMgT1BUSU9OQUw8L3NwYW4+XG4gICAgICA8L2Rpdj5cbiAgICAgIDxkaXYgY2xhc3NOYW1lPVwicGFuZWwtYm9keVwiIHN0eWxlPXt7IGRpc3BsYXk6ICdncmlkJywgZ2FwOiAnMC43NXJlbScgfX0+XG4gICAgICAgIDxkaXYgY2xhc3NOYW1lPVwib3BzLXN0YXR1cy1ncmlkXCI+XG4gICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPXtgb3BzLXN0YXR1cyAke2F1ZGlvU3RhdGUgPT09ICdSRUFEWScgPyAncmVhbCcgOiAnb2ZmbGluZSd9YH0+QVVESU86IHthdWRpb1N0YXRlID09PSAnUkVBRFknID8gJ1JFQURZJyA6IGF1ZGlvU3RhdGUucmVwbGFjZSgnXycsICcgJyl9PC9zcGFuPlxuICAgICAgICAgIHthdWRpb1N0YXRlICE9PSAnUkVBRFknICYmIDxidXR0b24gY2xhc3NOYW1lPVwiYnRuIGJ0bi1kYW5nZXJcIiBvbkNsaWNrPXtvbkVuYWJsZUF1ZGlvfSBkaXNhYmxlZD17YXVkaW9TdGF0ZSA9PT0gJ0lOSVRJQUxJWklORyd9PnthdWRpb1N0YXRlID09PSAnSU5JVElBTElaSU5HJyA/ICdJTklUSUFMSVpJTkcgQVVESU8uLi4nIDogJ0VOQUJMRSBBVURJTyd9PC9idXR0b24+fVxuICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT17YG9wcy1zdGF0dXMgJHtncHNNb2RlID09PSAnT0ZGTElORScgPyAnb2ZmbGluZScgOiAncmVhbCd9YH0+R1BTOiB7Z3BzTW9kZX08L3NwYW4+XG4gICAgICAgICAgPHNwYW4gY2xhc3NOYW1lPXtgb3BzLXN0YXR1cyAke3dzU3RhdGUgPT09ICdDT05ORUNURUQnID8gJ3JlYWwnIDogJ29mZmxpbmUnfWB9PldFQlNPQ0tFVDoge3dzU3RhdGV9PC9zcGFuPlxuICAgICAgICAgIDxzcGFuIGNsYXNzTmFtZT1cIm9wcy1zdGF0dXMgcmVhbFwiPklOLUFQUCBBTEVSVDoge2RlbW9QdXNoVmlzaWJsZSA/ICdBQ1RJVkUnIDogJ1JFQURZJ308L3NwYW4+XG4gICAgICAgIDwvZGl2PlxuXG4gICAgICAgIHtoYXNWb2ljZVN0YXR1cyAmJiAoXG4gICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJ2b2ljZS1hbGVydC1zdHJpcFwiIHJvbGU9XCJzdGF0dXNcIj5cbiAgICAgICAgICAgIDxkaXY+XG4gICAgICAgICAgICAgIDxzdHJvbmc+e3ZvaWNlU3RhdHVzTGFiZWx9PC9zdHJvbmc+XG4gICAgICAgICAgICAgIDxzbWFsbD5SRUFMIGJyb3dzZXIgc3BlYWtlciDigKIgcmVwZWF0cyB3aGlsZSB0aGlzIGVtZXJnZW5jeSBpcyBhY3RpdmU8L3NtYWxsPlxuICAgICAgICAgICAgPC9kaXY+XG4gICAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cInF1aWNrLWFjdGlvbnMtZ3JvdXBcIj5cbiAgICAgICAgICAgICAge2F1ZGlvU3RhdGUgIT09ICdSRUFEWScgJiYgPGJ1dHRvbiBjbGFzc05hbWU9XCJidG4gYnRuLWRhbmdlclwiIG9uQ2xpY2s9e29uRW5hYmxlQXVkaW99IGRpc2FibGVkPXthdWRpb1N0YXRlID09PSAnSU5JVElBTElaSU5HJ30+RU5BQkxFIEFVRElPPC9idXR0b24+fVxuICAgICAgICAgICAgICB7YWN0aXZlICYmIHZvaWNlU3RhdGUgIT09ICdNVVRFRCcgJiYgPGJ1dHRvbiBjbGFzc05hbWU9XCJidG4gYnRuLW91dGxpbmVcIiBvbkNsaWNrPXtvbk11dGV9Pk1VVEU8L2J1dHRvbj59XG4gICAgICAgICAgICAgIHthY3RpdmUgJiYgdm9pY2VTdGF0ZSA9PT0gJ01VVEVEJyAmJiA8YnV0dG9uIGNsYXNzTmFtZT1cImJ0biBidG4tb3V0bGluZVwiIG9uQ2xpY2s9e29uVW5tdXRlfT5VTk1VVEU8L2J1dHRvbj59XG4gICAgICAgICAgICAgIHthY3RpdmUgJiYgPGJ1dHRvbiBjbGFzc05hbWU9XCJidG4gYnRuLW91dGxpbmVcIiBvbkNsaWNrPXtvblJlcGxheX0+UkVQTEFZPC9idXR0b24+fVxuICAgICAgICAgICAgICB7YWN0aXZlICYmIDxidXR0b24gY2xhc3NOYW1lPVwiYnRuIGJ0bi1kYW5nZXJcIiBvbkNsaWNrPXtvblN0b3BWb2ljZX0+U1RPUCBBTEVSVDwvYnV0dG9uPn1cbiAgICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgIDwvZGl2PlxuICAgICAgICApfVxuICAgICAgICB7dm9pY2VFcnJvciAmJiA8c21hbGwgcm9sZT1cInN0YXR1c1wiIHN0eWxlPXt7IGNvbG9yOiAnI2I5MWMxYycgfX0+e3ZvaWNlRXJyb3J9PC9zbWFsbD59XG5cbiAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJncHMtY29udHJvbC1yb3dcIj5cbiAgICAgICAgICA8ZGl2PlxuICAgICAgICAgICAgPHN0cm9uZz5HUFM6IHtncHNNb2RlfTwvc3Ryb25nPlxuICAgICAgICAgICAge2xhc3RQb3NpdGlvbiAmJiA8c21hbGw+UkVBTCBERVZJQ0Ug4oCiIHtsYXN0UG9zaXRpb24ubGF0aXR1ZGUudG9GaXhlZCg2KX0sIHtsYXN0UG9zaXRpb24ubG9uZ2l0dWRlLnRvRml4ZWQoNil9IOKAoiB7bmV3IERhdGUobGFzdFBvc2l0aW9uLnRpbWVzdGFtcCkudG9Mb2NhbGVUaW1lU3RyaW5nKCl9PC9zbWFsbD59XG4gICAgICAgICAgICB7Z3BzTm90aWNlICYmIDxzbWFsbD57Z3BzTm90aWNlfTwvc21hbGw+fVxuICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwicXVpY2stYWN0aW9ucy1ncm91cFwiPlxuICAgICAgICAgICAgPGJ1dHRvbiBjbGFzc05hbWU9XCJidG4gYnRuLW91dGxpbmVcIiBvbkNsaWNrPXtlbmFibGVMaXZlR3BzfT5FTkFCTEUgTElWRSBHUFM8L2J1dHRvbj5cbiAgICAgICAgICAgIDxidXR0b24gY2xhc3NOYW1lPVwiYnRuIGJ0bi1vdXRsaW5lXCIgb25DbGljaz17c3RvcEdwc30gZGlzYWJsZWQ9e2dwc01vZGUgPT09ICdPRkZMSU5FJ30+U1RPUCBHUFM8L2J1dHRvbj5cbiAgICAgICAgICA8L2Rpdj5cbiAgICAgICAgPC9kaXY+XG5cbiAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJvcHMtaW50ZWdyYXRpb25zLW5vdGVcIj5cbiAgICAgICAgICA8c3Bhbj5PUFRJT05BTCBFWFRFUk5BTCBJTlRFR1JBVElPTlM8L3NwYW4+XG4gICAgICAgICAgPHNwYW4+QVVUSEVOVElDQVRFRCBJTi1BUFAgV0VCU09DS0VUIE9OTFk8L3NwYW4+XG4gICAgICAgIDwvZGl2PlxuICAgICAgPC9kaXY+XG4gICAgPC9zZWN0aW9uPlxuICApO1xufTtcbiJdLCJmaWxlIjoiQzovVXNlcnMvcmFqdWIvRG93bmxvYWRzL2dlbmFpL0FJVEFNL2Zyb250ZW5kL3NyYy9jb21wb25lbnRzL1JlYWxPcGVyYXRpb25zQ29udHJvbHMudHN4In0=

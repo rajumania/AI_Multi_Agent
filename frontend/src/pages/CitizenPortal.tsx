@@ -19,6 +19,8 @@ import { api, appendWsToken } from '../services/api';
 import { Incident } from '../types';
 import { citizenProgress, PhaseState } from '../portal/incidentProgress';
 import { PersonalAssistant } from '../components/PersonalAssistant';
+import { OfflineStatus } from '../components/OfflineStatus';
+import { CommunitySafetyPanel } from '../components/CommunitySafetyPanel';
 
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -47,7 +49,7 @@ function PhaseDot({ state }: { state: PhaseState }) {
 }
 
 // ---------------------------------------------------------------------------
-// CitizenPortal (Increment 2). A campus member can:
+// CitizenPortal (Increment 2). A community member can:
 //   * Report an emergency (reuses the existing ReportEmergencyModal).
 //   * See ONLY the incidents they themselves reported (the backend scopes
 //     GET /incidents by the verified token — this list is not client-filtered).
@@ -86,7 +88,9 @@ export const CitizenPortal: React.FC = () => {
   useEffect(() => {
     fetchMine();
     const interval = setInterval(fetchMine, 10000);
-    return () => clearInterval(interval);
+    const handleOnline = () => { void fetchMine(); };
+    window.addEventListener('online', handleOnline);
+    return () => { clearInterval(interval); window.removeEventListener('online', handleOnline); };
   }, [fetchMine]);
 
   // Phase 4B: Real-time WebSocket listener. The backend's event_visibility.py
@@ -125,13 +129,19 @@ export const CitizenPortal: React.FC = () => {
       if (disposed) return;
       try {
         socket = new WebSocket(appendWsToken(`${base}/api/v1/events/ws`));
+        socket.onopen = () => setNotificationRefreshKey((value) => value + 1);
         socket.onmessage = (msg) => {
           try {
             const data = JSON.parse(msg.data);
             const eventName: string = data.event_name || data.event || '';
             const incidentId: string = data.incident_id || '';
             // Only refresh if this is a safe event for one of this user's incidents.
-            if (eventName === 'notification_created') setNotificationRefreshKey((value) => value + 1);
+            if (eventName === 'notification_created' && data.recipient_type === 'user' && data.notification_id) {
+              setNotificationRefreshKey((value) => value + 1);
+              if (socket?.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ type: 'notification_delivered', notification_id: data.notification_id }));
+              }
+            }
             if (USER_SAFE_EVENTS.has(eventName) && incidentId && incidentIdsRef.current.has(incidentId)) {
               fetchMine();
             }
@@ -183,7 +193,8 @@ export const CitizenPortal: React.FC = () => {
 
   return (
     <div className="citizen-portal" style={{ minHeight: '100vh', background: '#f1f5f9', fontFamily: 'Inter, sans-serif' }}>
-      <PortalHeader subtitle="Campus Member Portal" accent="#0ea5e9" notificationRefreshKey={notificationRefreshKey} />
+      <OfflineStatus />
+      <PortalHeader subtitle="Community Portal" accent="#0ea5e9" notificationRefreshKey={notificationRefreshKey} />
 
       <main className="citizen-portal-main" style={{ maxWidth: '1040px', margin: '0 auto', padding: '1.5rem 1rem 3rem' }}>
         {/* Hero / report action */}
@@ -202,10 +213,10 @@ export const CitizenPortal: React.FC = () => {
           }}
         >
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800 }}>Stay safe on campus</h1>
+            <h1 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800 }}>Stay safe in your community</h1>
             <p style={{ margin: '0.35rem 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
               Report an emergency and track its progress. Your reports are private to you and the
-              campus safety team.
+              community response team.
             </p>
           </div>
           <button
@@ -347,14 +358,14 @@ export const CitizenPortal: React.FC = () => {
               <div className="citizen-assistant-card-header">
                 <div className="citizen-assistant-icon" aria-hidden="true"><Sparkles size={21} /></div>
                 <div>
-                  <div className="citizen-assistant-eyebrow">CAMPUSFLOW AI</div>
+                  <div className="citizen-assistant-eyebrow">AITAM DISASTER RESPONSE AI</div>
                   <h2 id="citizen-assistant-title">Personal Safety Assistant</h2>
                 </div>
                 <span className="citizen-assistant-status"><span aria-hidden="true" /> Available</span>
               </div>
 
               <p className="citizen-assistant-description">
-                Ask about campus safety, emergency reporting, available resources, or preferences remembered for your account.
+                Ask about community safety, emergency reporting, available resources, or preferences remembered for your account.
               </p>
 
               <div className="citizen-assistant-context" aria-label="Private assistant context">
@@ -366,23 +377,23 @@ export const CitizenPortal: React.FC = () => {
               </div>
 
               <button className="citizen-assistant-primary" type="button" onClick={() => openAssistant()}>
-                Ask CampusFlow AI <ArrowRight size={17} aria-hidden="true" />
+                Ask AITAM Safety AI <ArrowRight size={17} aria-hidden="true" />
               </button>
 
               <div className="citizen-assistant-quick-actions" aria-label="Assistant quick actions">
-                <button type="button" onClick={() => openAssistant('I have a question about campus safety.')}>
+                <button type="button" onClick={() => openAssistant('I have a question about community safety.')}>
                   <MessageCircle size={15} aria-hidden="true" /> Ask a Safety Question
                 </button>
-                <button type="button" onClick={() => openAssistant('How do I report an emergency on campus?')}>
+                <button type="button" onClick={() => openAssistant('How do I report an emergency in my community?')}>
                   <AlertTriangle size={15} aria-hidden="true" /> How do I Report an Emergency?
                 </button>
-                <button type="button" onClick={() => openAssistant('Please share campus safety information and available resources.')}>
-                  <BookOpen size={15} aria-hidden="true" /> Campus Safety Information
+                <button type="button" onClick={() => openAssistant('Please share community safety information and available resources.')}>
+                  <BookOpen size={15} aria-hidden="true" /> Community Safety Information
                 </button>
               </div>
 
               <p className="citizen-assistant-disclaimer">
-                For immediate danger, use <strong>Report an Emergency</strong>. This assistant supports your safety decisions but does not replace emergency services or campus operators.
+                For immediate danger, use <strong>Report an Emergency</strong>. This assistant supports your safety decisions but does not replace emergency services or response coordinators.
               </p>
             </section>
 
@@ -446,7 +457,7 @@ export const CitizenPortal: React.FC = () => {
               )}
             </section>
 
-            <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.1rem 1.25rem' }}>
+          <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.1rem 1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Bell size={16} color="#0ea5e9" />
                 <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Notifications</strong>
@@ -455,10 +466,11 @@ export const CitizenPortal: React.FC = () => {
                 Status changes for your reports appear here in real time. Only safe updates for your
                 own incidents are delivered.
               </p>
-            </section>
+          </section>
 
-          </div>
         </div>
+        </div>
+        <CommunitySafetyPanel incidents={incidents} refreshKey={notificationRefreshKey} />
       </main>
 
       <ReportEmergencyModal

@@ -14,8 +14,8 @@
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three';
-import { AGENT_CONNECTIONS, HUMAN_CONNECTIONS, HUMAN_RESPONSE_TEAMS, VISUAL_AGENTS } from './agentCatalog';
-import { STATUS_VISUALS, deriveAgentDisplayStatus, humanTeamVisual, type DisplayStatus } from './agentStatus';
+import { AGENT_CONNECTIONS, VISUAL_AGENTS } from './agentCatalog';
+import { STATUS_VISUALS, deriveAgentDisplayStatus, type DisplayStatus } from './agentStatus';
 import { createAgentNode, type AgentNodeHandle } from './AgentNode';
 import type { IncidentWorkflowState } from '../realtime/workflowReducer';
 
@@ -98,22 +98,13 @@ export function createCommandCenterScene(
 
   // Nodes — one per visual agent, keyed by its REAL backend node key.
   const positionByKey: Record<string, readonly [number, number, number]> = {};
-  const humanByKey: Record<string, (typeof HUMAN_RESPONSE_TEAMS)[number]> = {};
-  const nodes: Array<{ key: string; node: AgentNodeHandle; human?: (typeof HUMAN_RESPONSE_TEAMS)[number] }> = [];
+  const nodes: Array<{ key: string; node: AgentNodeHandle }> = [];
   for (const agent of VISUAL_AGENTS) {
     positionByKey[agent.key] = agent.position;
     const node = createAgentNode(agent.accent, agent.position);
     scene.add(node.group);
     nodes.push({ key: agent.key, node });
   }
-  for (const team of HUMAN_RESPONSE_TEAMS) {
-    positionByKey[team.key] = team.position;
-    humanByKey[team.key] = team;
-    const node = createAgentNode(team.accent, team.position);
-    scene.add(node.group);
-    nodes.push({ key: team.key, node, human: team });
-  }
-
   // Connector lines — resolved from catalog key-pairs to node positions. Base
   // color is slate; when the source node is active it brightens toward accent.
   const accentByKey: Record<string, string> = {};
@@ -126,7 +117,7 @@ export function createCommandCenterScene(
     fromKey: string;
     activeColor: THREE.Color;
   }> = [];
-  for (const [fromKey, toKey] of [...AGENT_CONNECTIONS, ...HUMAN_CONNECTIONS]) {
+  for (const [fromKey, toKey] of AGENT_CONNECTIONS) {
     const from = positionByKey[fromKey];
     const to = positionByKey[toKey];
     if (!from || !to) continue;
@@ -273,20 +264,15 @@ export function createCommandCenterScene(
 
     // Reflect REAL per-agent status on every node this frame.
     const activeKeys = new Set<string>();
-    for (const { key, node, human } of nodes) {
-      const status = human
-        ? humanTeamVisual(currentIncident?.assignments?.[human.department]?.status, human.accent)
-        : STATUS_VISUALS[deriveAgentDisplayStatus(currentIncident, key)];
+    for (const { key, node } of nodes) {
+      const status = STATUS_VISUALS[deriveAgentDisplayStatus(currentIncident, key)];
       node.update(status, elapsed, selectedAgentKey === key);
       if (ACTIVE_FOR_LINKS.has(status.status)) activeKeys.add(key);
     }
 
     // Spawn data-flow particles along active connections.
-    for (const [fromKey, toKey] of [...AGENT_CONNECTIONS, ...HUMAN_CONNECTIONS]) {
-      const human = humanByKey[fromKey];
-      const status = human
-        ? humanTeamVisual(currentIncident?.assignments?.[human.department]?.status, human.accent).status
-        : deriveAgentDisplayStatus(currentIncident, fromKey);
+    for (const [fromKey, toKey] of AGENT_CONNECTIONS) {
+      const status = deriveAgentDisplayStatus(currentIncident, fromKey);
       if (status === 'IDLE' || status === 'QUEUED') continue;
 
       const connKey = `${fromKey}->${toKey}`;

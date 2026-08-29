@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional
 from backend.services.llm_service import llm_service
 
 
-TRANSPORT_AGENT_SYSTEM_PROMPT = """You are the specialized Transport & Evacuation Logistics Agent for CAMPUSFLOW AI.
+TRANSPORT_AGENT_SYSTEM_PROMPT = """You are the specialized Transport & Evacuation Logistics Agent for AITAM Disaster Response AI.
 Your duty is to assess mobility requirements, emergency corridor routing, evacuation shuttle dispatch, and parking/gate management.
 
 CRITICAL SAFETY RULES:
@@ -27,7 +27,7 @@ Output JSON format:
 class TransportAgent:
     """
     Specialized Transport Agent:
-    - Coordinates campus emergency vehicles and evacuation shuttles.
+    - Coordinates emergency vehicles and evacuation shuttles.
     - Manages perimeter traffic flow, keeps ambulance corridors clear.
     """
 
@@ -75,19 +75,19 @@ class TransportAgent:
             actions.append("Direct non-emergency vehicles away from adjacent access avenues.")
             if is_high:
                 if veh_ids:
-                    actions.append(f"Dispatch Campus Emergency Vehicle ({veh_ids[0]}) for perimeter safety barrier transport.")
+                    actions.append(f"Dispatch Emergency Vehicle ({veh_ids[0]}) for perimeter safety barrier transport.")
                 else:
-                    actions.append("Dispatch available campus van for perimeter safety barrier transport.")
+                    actions.append("Dispatch an available response van for perimeter safety barrier transport.")
             route_status = "restricted"
             vehicles = 1 if is_high else 0
             shuttles = 1 if severity == "critical" else 0
             reroute = True
         elif incident_type == "weather":
-            target_shelter = shelter_names[0] if shelter_names else "North Campus Shelter"
+            target_shelter = shelter_names[0] if shelter_names else "North Community Shelter"
             if veh_ids:
-                actions.append(f"Deploy Campus Shuttles ({', '.join(veh_ids)}) to transfer students to {target_shelter}.")
+                actions.append(f"Deploy Response Shuttles ({', '.join(veh_ids)}) to transfer evacuees to {target_shelter}.")
             else:
-                actions.append(f"Deploy emergency shuttles to transfer students to {target_shelter}.")
+                actions.append(f"Deploy emergency shuttles to transfer evacuees to {target_shelter}.")
             actions.append("Close low-lying pathways subject to waterlogging.")
             route_status = "restricted"
             vehicles = 2

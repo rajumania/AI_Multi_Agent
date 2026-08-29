@@ -16,6 +16,7 @@ from backend.database.models import CampusResourceDB, DepartmentResponseDB, Inci
 from backend.services.audit_service import audit_service
 from backend.services.departments import departments_for_incident, normalize_department
 from backend.services.event_engine import event_engine
+from backend.services.notification_service import build_operational_details
 
 
 NOTIFIED = "NOTIFIED"
@@ -80,17 +81,40 @@ def _required_departments(incident: IncidentDB) -> List[str]:
     return result or departments_for_incident(incident.incident_type, incident.severity)
 
 
-def _add_notification(db: Session, *, incident_id: str, department: str, status_name: str, recipient_type: str, recipient_id: Optional[str], now: datetime) -> NotificationDB:
+def _add_notification(
+    db: Session,
+    *,
+    incident: IncidentDB,
+    department: str,
+    status_name: str,
+    recipient_type: str,
+    recipient_id: Optional[str],
+    now: datetime,
+    event_key: Optional[str] = None,
+    title: Optional[str] = None,
+    message: Optional[str] = None,
+    level: Optional[str] = None,
+    priority: Optional[str] = None,
+    details: Optional[dict] = None,
+) -> Optional[NotificationDB]:
+    event_key = event_key or f"{recipient_type}:{incident.incident_id}:{department}:{status_name}"
+    if db.query(NotificationDB).filter(NotificationDB.event_key == event_key).first():
+        return None
+    notification_priority = priority or {NOTIFIED: "critical", ACCEPTED: "high", DECLINED: "high", TEAM_ASSIGNED: "medium", EN_ROUTE: "high", ON_SCENE: "high", COMPLETED: "low"}.get(status_name, "medium")
     row = NotificationDB(
         recipient_type=recipient_type,
         recipient_id=recipient_id,
         department=department,
-        incident_id=incident_id,
-        title=TITLES[status_name],
-        message=f"{department} assignment for incident {incident_id}: {status_name}.",
-        level="critical" if status_name in {NOTIFIED, DECLINED} else "info",
+        incident_id=incident.incident_id,
+        title=title or TITLES[status_name],
+        message=message or f"{department} assignment for incident {incident.incident_id}: {status_name}.",
+        level=level or notification_priority,
         read=0,
         created_at=now,
+        priority=notification_priority,
+        lifecycle_status="CREATED",
+        event_key=event_key,
+        details_json=json.dumps(details or build_operational_details(db, incident, department=department, response_status=status_name, approval_status="approved"), default=str, separators=(",", ":")),
     )
     db.add(row)
     return row
@@ -125,9 +149,21 @@ def _emit_notification_created(
             "assignment_id": assignment.id,
             "actor": actor,
             "timestamp": now.isoformat(),
+            "priority": notification.priority,
+            "lifecycle_status": notification.lifecycle_status,
+            "delivered_at": notification.delivered_at.isoformat() if notification.delivered_at else None,
+            **_notification_details(notification),
         },
         db=None,
     )
+
+
+def _notification_details(notification: NotificationDB) -> dict:
+    try:
+        value = json.loads(notification.details_json or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        value = {}
+    return value if isinstance(value, dict) else {}
 
 
 def _emit(
@@ -166,6 +202,7 @@ def _emit(
 def create_required_assignments(incident: IncidentDB, db: Session, actor: str = "System") -> List[DepartmentResponseDB]:
     """Create NOTIFIED rows for required departments, idempotently."""
     created: List[DepartmentResponseDB] = []
+    notifications: List[Tuple[DepartmentResponseDB, NotificationDB]] = []
     now = _now()
     for department in _required_departments(incident):
         existing = db.query(DepartmentResponseDB).filter(
@@ -188,21 +225,13 @@ def create_required_assignments(incident: IncidentDB, db: Session, actor: str = 
         db.flush()
         department_notification = _add_notification(
             db,
-            incident_id=incident.incident_id,
-            department=department,
-            status_name=NOTIFIED,
-            recipient_type="department",
-            recipient_id=department,
-            now=now,
+            incident=incident, department=department, status_name=NOTIFIED,
+            recipient_type="department", recipient_id=department, now=now,
         )
         _add_notification(
             db,
-            incident_id=incident.incident_id,
-            department=department,
-            status_name=NOTIFIED,
-            recipient_type="admin",
-            recipient_id=None,
-            now=now,
+            incident=incident, department=department, status_name=NOTIFIED,
+            recipient_type="admin", recipient_id=None, now=now,
         )
         audit_service.log(
             action_type="department_notified",
@@ -213,9 +242,77 @@ def create_required_assignments(incident: IncidentDB, db: Session, actor: str = 
             db=db,
         )
         created.append(assignment)
-        _emit_notification_created(assignment, department_notification, actor, now)
-        _emit(assignment, EVENTS[NOTIFIED], actor, now, previous_status=None)
+        if department_notification:
+            notifications.append((assignment, department_notification))
+    # The approval endpoint owns the transaction containing the incident,
+    # assignments, audit entries, and notification rows. Commit before any
+    # socket frame is scheduled so a portal acknowledgement can always see
+    # the durable notification row.
+    if created:
+        db.commit()
+        for assignment, notification in notifications:
+            _emit_notification_created(assignment, notification, actor, now)
+        for assignment in created:
+            _emit(assignment, EVENTS[NOTIFIED], actor, now, previous_status=None)
     return created
+
+
+def notify_replan_approval(incident: IncidentDB, plan_id: str, db: Session, actor: str = "System") -> List[NotificationDB]:
+    """Notify existing routed departments when a new plan is approved.
+
+    Assignment rows remain idempotent across plans, but a re-plan is a new
+    approval-gated operational decision and therefore needs a new durable
+    notification. The plan id makes the event key unique without duplicating
+    department assignments or broadening the audience.
+    """
+    notifications: List[NotificationDB] = []
+    now = _now()
+    assignments = db.query(DepartmentResponseDB).filter(DepartmentResponseDB.incident_id == incident.incident_id).order_by(DepartmentResponseDB.department.asc()).all()
+    for assignment in assignments:
+        department = normalize_department(assignment.department)
+        if not department:
+            continue
+        message = f"Updated approved response plan {plan_id} for incident {incident.incident_id} is ready for {department}."
+        details = build_operational_details(db, incident, department=department, response_status="REPLAN_APPROVED", approval_status="approved")
+        department_notification = _add_notification(
+            db,
+            incident=incident,
+            department=department,
+            status_name=NOTIFIED,
+            recipient_type="department",
+            recipient_id=department,
+            now=now,
+            event_key=f"department:{incident.incident_id}:{department}:replan:{plan_id}",
+            title="Updated response plan approved",
+            message=message,
+            level="critical",
+            priority="critical",
+            details={**details, "plan_id": plan_id, "response_status": "REPLAN_APPROVED"},
+        )
+        _add_notification(
+            db,
+            incident=incident,
+            department=department,
+            status_name=NOTIFIED,
+            recipient_type="admin",
+            recipient_id=None,
+            now=now,
+            event_key=f"admin:{incident.incident_id}:{department}:replan:{plan_id}",
+            title="Updated response plan approved",
+            message=message,
+            level="critical",
+            priority="critical",
+            details={**details, "plan_id": plan_id, "response_status": "REPLAN_APPROVED"},
+        )
+        if department_notification:
+            notifications.append(department_notification)
+    if notifications:
+        db.commit()
+        for notification in notifications:
+            assignment = next((item for item in assignments if normalize_department(item.department) == normalize_department(notification.department)), None)
+            if assignment:
+                _emit_notification_created(assignment, notification, actor, now)
+    return notifications
 
 
 def list_for_incident(incident_id: str, db: Session, principal) -> List[DepartmentResponseDB]:
@@ -252,6 +349,9 @@ def transition(incident_id: str, department_value: str, target: str, db: Session
     ).first()
     if assignment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Department assignment not found.")
+    incident = db.query(IncidentDB).filter(IncidentDB.incident_id == incident_id).first()
+    if incident is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found.")
 
     previous = (assignment.status or NOTIFIED).upper()
     if target not in TRANSITIONS.get(previous, ()):
@@ -296,25 +396,18 @@ def transition(incident_id: str, department_value: str, target: str, db: Session
     )
     department_notification = _add_notification(
         db,
-        incident_id=incident_id,
-        department=department,
-        status_name=target,
-        recipient_type="department",
-        recipient_id=department,
-        now=now,
+        incident=incident, department=department, status_name=target,
+        recipient_type="department", recipient_id=department, now=now,
     )
     _add_notification(
         db,
-        incident_id=incident_id,
-        department=department,
-        status_name=target,
-        recipient_type="admin",
-        recipient_id=None,
-        now=now,
+        incident=incident, department=department, status_name=target,
+        recipient_type="admin", recipient_id=None, now=now,
     )
     db.commit()
     db.refresh(assignment)
-    _emit_notification_created(assignment, department_notification, actor, now)
+    if department_notification:
+        _emit_notification_created(assignment, department_notification, actor, now)
     _emit(assignment, EVENTS[target], actor, now, previous_status=previous)
     if target == ON_SCENE and department == "TRANSPORT":
         try:

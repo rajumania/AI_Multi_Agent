@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from enum import Enum
 import json
 import math
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator, ConfigDict, model_validator
 
 
@@ -17,6 +17,25 @@ class IncidentType(str, Enum):
     FACILITY = "facility"
     OTHER = "other"
     UNKNOWN = "unknown"
+    FLOOD = "flood"
+    URBAN_FLOOD = "urban_flood"
+    CYCLONE = "cyclone"
+    LANDSLIDE = "landslide"
+    SEVERE_WEATHER = "severe_weather"
+    HEATWAVE = "heatwave"
+    EARTHQUAKE = "earthquake"
+
+
+class DisasterType(str, Enum):
+    FLOOD = "flood"
+    URBAN_FLOOD = "urban_flood"
+    CYCLONE = "cyclone"
+    LANDSLIDE = "landslide"
+    SEVERE_WEATHER = "severe_weather"
+    HEATWAVE = "heatwave"
+    EARTHQUAKE = "earthquake"
+    FIRE = "fire"
+    OTHER = "other"
 
 
 class SeverityLevel(str, Enum):
@@ -50,19 +69,21 @@ class IncidentStatus(str, Enum):
 
 
 class IncidentBase(BaseModel):
-    description: str = Field(..., min_length=3, description="Detailed description of the incident")
+    description: str = Field(..., min_length=3, max_length=10000, description="Detailed description of the incident")
     incident_type: IncidentType = Field(default=IncidentType.UNKNOWN, description="Conceptual category of incident")
-    location: str = Field(..., min_length=2, description="Campus location or building name")
+    disaster_type: Optional[DisasterType] = Field(default=None, description="Optional disaster-domain classification")
+    location: str = Field(..., min_length=2, max_length=100, description="Campus location or building name")
     severity: SeverityLevel = Field(default=SeverityLevel.UNKNOWN, description="Assessed severity level")
     injured_count: Optional[int] = Field(
         default=None,
         ge=0,
         description="Number of confirmed injured individuals. Must be null if unknown."
     )
-    evidence_source: Optional[str] = Field(default="direct_report", description="Origin/source of evidence")
-    reported_by: Optional[str] = Field(default="Campus Operator", description="Reporter identifier or role")
+    evidence_source: Optional[str] = Field(default="direct_report", max_length=100, description="Origin/source of evidence")
+    reported_by: Optional[str] = Field(default="Community Reporter", max_length=100, description="Reporter identifier or role")
     latitude: Optional[float] = Field(default=None, ge=-90.0, le=90.0, description="Exact incident latitude when selected")
     longitude: Optional[float] = Field(default=None, ge=-180.0, le=180.0, description="Exact incident longitude when selected")
+    image_url: Optional[str] = Field(default=None, max_length=500, description="Optional reporter evidence reference")
 
     @field_validator("latitude", "longitude")
     @classmethod
@@ -96,12 +117,12 @@ class IncidentCreate(IncidentBase):
 
 
 class IncidentCloseRequest(BaseModel):
-    closed_by: str = Field(default="Authorized Campus Operator")
+    closed_by: str = Field(default="Authorized Response Commander")
     closing_notes: Optional[str] = Field(default="Incident record administratively finalized and archived.")
 
 
 class IncidentConfirmResponseRequest(BaseModel):
-    confirmed_by: str = Field(default="Authorized Campus Operator")
+    confirmed_by: str = Field(default="Authorized Response Commander")
     notes: Optional[str] = Field(default="First responders confirmed arrival on-scene and active management underway.")
 
 
@@ -117,6 +138,11 @@ class IncidentRead(IncidentBase):
     closed_at: Optional[datetime] = None
     resolution_note: Optional[str] = None
     required_departments: list[str] = Field(default_factory=list)
+    region_id: Optional[str] = None
+    zone_id: Optional[str] = None
+    community_id: Optional[str] = None
+    client_operation_id: Optional[str] = None
+    detection_evidence: Optional[dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -132,6 +158,17 @@ class IncidentRead(IncidentBase):
             except (TypeError, ValueError):
                 return []
         return value or []
+
+    @field_validator("detection_evidence", mode="before")
+    @classmethod
+    def parse_detection_evidence(cls, value):
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, dict) else None
+            except (TypeError, ValueError, json.JSONDecodeError):
+                return None
+        return value if isinstance(value, dict) else None
 
 
 class SupervisorAnalysisResult(BaseModel):

@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional
 from backend.services.llm_service import llm_service
 
 
-MEDICAL_AGENT_SYSTEM_PROMPT = """You are the specialized Medical Response & Triage Agent for CAMPUSFLOW AI.
+MEDICAL_AGENT_SYSTEM_PROMPT = """You are the specialized Medical Response & Triage Agent for AITAM Disaster Response AI.
 Your duty is to assess healthcare risks, triage readiness, first-aid deployment, and ambulance dispatch recommendations.
 
 CRITICAL SAFETY RULES:
@@ -78,9 +78,9 @@ class MedicalAgent:
         if injured_count is not None and injured_count > 0:
             target_amb = min(injured_count, len(amb_ids)) if amb_ids else 1
             if amb_ids:
-                actions.append(f"Dispatch Campus Ambulance ({', '.join(amb_ids[:target_amb])}) directly to {location}.")
+                actions.append(f"Dispatch Emergency Ambulance ({', '.join(amb_ids[:target_amb])}) directly to {location}.")
             else:
-                actions.append(f"Alert municipal ambulance dispatch for {location} (No campus units available).")
+                actions.append(f"Alert municipal ambulance dispatch for {location} (No local units available).")
             
             actions.append(f"Alert Central Medical Center emergency room for {injured_count} incoming patient(s).")
             
@@ -108,7 +108,7 @@ class MedicalAgent:
         else:
             # UNKNOWN casualties (Precautionary safety posture - strictly zero casualty hallucination)
             if amb_ids:
-                actions.append(f"Place Campus Ambulance ({amb_ids[0]}) on immediate standby near {location}.")
+                actions.append(f"Place Emergency Ambulance ({amb_ids[0]}) on immediate standby near {location}.")
             else:
                 actions.append(f"Request municipal standby ambulance near {location}.")
 

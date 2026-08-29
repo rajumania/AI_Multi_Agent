@@ -60,8 +60,8 @@ export const ResourcesPage: React.FC = () => {
     <div className="app-content">
       <div className="dashboard-title-row">
         <div>
-          <h2>Campus Emergency Resource Inventory</h2>
-          <p>Real-time physical asset coordination backed by Model Context Protocol (MCP) and SQLite database.</p>
+          <h2>Emergency Resource Inventory</h2>
+          <p>Real-time shelters, hospitals, vehicles, teams, and relief supplies backed by the existing MCP and database services.</p>
         </div>
 
         <div className="quick-actions-group">
@@ -116,14 +116,14 @@ export const ResourcesPage: React.FC = () => {
         </div>
 
         <div style={{ marginLeft: 'auto', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-          Showing <strong>{filtered.length}</strong> of {resources.length} campus assets
+          Showing <strong>{filtered.length}</strong> of {resources.length} emergency resources
         </div>
       </div>
 
       {/* Grid of Resources */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-          Loading campus resource records from SQLite...
+          Loading emergency resource records from the response database...
         </div>
       ) : filtered.length === 0 ? (
         <div className="panel-card" style={{ padding: '3rem', textAlign: 'center' }}>

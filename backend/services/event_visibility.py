@@ -1,4 +1,4 @@
-"""WebSocket event visibility rules for CampusFlow AI (Increment 1).
+"""WebSocket event visibility rules for AITAM Disaster Response AI (Increment 1).
 
 Pure, DB-free logic that decides which live events a given connection may
 receive. This is the real-time counterpart to the REST RBAC guards: the socket
@@ -34,6 +34,8 @@ USER_SAFE_EVENTS = frozenset({
     "response_status_changed",
     "dispatch_started",
     "response_dispatched",
+    "response_execution_started",
+    "response_execution_completed",
     "resource_dispatched",
     "vehicle_arrived",
     "monitoring_started",
@@ -41,6 +43,13 @@ USER_SAFE_EVENTS = frozenset({
     "incident_closed",
     "in_app_alert_available",
     "notification_created",
+    "notification_delivered",
+    "notification_read",
+    "notification_failed",
+    "risk_updated",
+    "early_warning_created",
+    "weather_updated",
+    "environment_updated",
 })
 
 # Assignment events carry a concrete department in their payload. Department
@@ -57,6 +66,9 @@ DEPARTMENT_SCOPED_EVENTS = frozenset({
     "dept_on_scene",
     "dept_assignment_completed",
     "notification_created",
+    "notification_delivered",
+    "notification_read",
+    "notification_failed",
     "transport_location_updated",
     "transport_route_created",
     "transport_route_updated",
@@ -82,6 +94,11 @@ TRANSPORT_PRIVATE_EVENTS = frozenset({
     "vehicle_location_updated",
     "vehicle_arrived",
 })
+
+# Sensor telemetry is operationally relevant to every authenticated response
+# department. These frames intentionally contain readings/anomaly metadata,
+# not private reporter details, and sensor IDs are not incident IDs.
+DEPARTMENT_GLOBAL_EVENTS = frozenset({"sensor_update", "environment_anomaly", "disaster_detected"})
 
 
 @dataclass
@@ -151,12 +168,14 @@ def should_deliver(
     owner: Optional[str] = incident_scope.get("user_id")
 
     if scope.subject_type == "department":
+        if event_name in DEPARTMENT_GLOBAL_EVENTS:
+            return True
         if scope.department is None or scope.department not in departments:
             return False
         # An incident can legitimately involve several departments. Assignment
         # events are still private to the department named by the event.
         if event_name in DEPARTMENT_SCOPED_EVENTS and event_payload:
-            if event_name == "notification_created" and event_payload.get("recipient_type") != "department":
+            if event_name in {"notification_created", "notification_delivered", "notification_read", "notification_failed"} and event_payload.get("recipient_type") != "department":
                 return False
             event_department = normalize_department(event_payload.get("department"))
             if event_department is not None:
@@ -170,7 +189,7 @@ def should_deliver(
             return False
         if owner is None or owner != scope.user_id:
             return False
-        if event_name == "notification_created" and event_payload:
+        if event_name in {"notification_created", "notification_delivered", "notification_read", "notification_failed"} and event_payload:
             return (
                 event_payload.get("recipient_type") == "user"
                 and str(event_payload.get("recipient_id")) == str(scope.user_id)

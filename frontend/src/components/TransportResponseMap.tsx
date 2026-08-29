@@ -20,7 +20,7 @@ export const TransportResponseMap: React.FC<Props> = ({ assignment, incident, tr
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
-    const center: [number, number] = [incident.latitude ?? 16.2334, incident.longitude ?? 80.5513];
+    const center: [number, number] = [incident.latitude ?? 18.56517, incident.longitude ?? 84.19587];
     const map = L.map(mapContainer.current, { center, zoom: 16, zoomControl: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
     layerRef.current = L.layerGroup().addTo(map);

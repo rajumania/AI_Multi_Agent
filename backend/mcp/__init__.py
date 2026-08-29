@@ -1,5 +1,5 @@
 """
-CampusFlow AI - Model Context Protocol (MCP) Package
+AITAM Disaster Response AI - Model Context Protocol (MCP) Package
 """
 from backend.mcp.server import MCPServer, mcp_server
 

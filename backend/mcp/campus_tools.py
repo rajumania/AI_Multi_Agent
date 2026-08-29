@@ -29,7 +29,7 @@ class CampusMCPTools:
         best_unit = None
         min_dist = float("inf")
         for u in units:
-            dist = math.hypot((u.latitude or 16.2334) - target_lat, (u.longitude or 80.5513) - target_lng)
+            dist = math.hypot((u.latitude or 18.56517) - target_lat, (u.longitude or 84.19587) - target_lng)
             if dist < min_dist:
                 min_dist = dist
                 best_unit = u
@@ -78,7 +78,7 @@ class CampusMCPTools:
         if not ambulances:
             return None
 
-        best = min(ambulances, key=lambda a: math.hypot((a.latitude or 16.2332) - target_lat, (a.longitude or 80.5502) - target_lng))
+        best = min(ambulances, key=lambda a: math.hypot((a.latitude or 18.56497) - target_lat, (a.longitude or 84.19567) - target_lng))
         return {
             "resource_id": best.resource_id,
             "name": best.name,
@@ -101,7 +101,7 @@ class CampusMCPTools:
     def check_medical_capacity(self, db: Session) -> Dict[str, Any]:
         """MCP Tool: Queries Campus Health Centre triage beds and emergency doctors on duty."""
         return {
-            "facility": "Vignan Campus Health & Medical Centre",
+            "facility": "AITAM Health & Medical Centre",
             "triage_beds_available": 6,
             "paramedics_on_duty": 3,
             "physician_on_call": "Dr. K. S. Rao (Ext 401)",
@@ -117,7 +117,7 @@ class CampusMCPTools:
         return {
             "origin": origin_name,
             "destination": destination_name,
-            "route_corridor": f"Main Vadlamudi Boulevard -> East Perimeter Road -> {destination_name} Access Gate",
+            "route_corridor": f"AITAM main access corridor -> campus perimeter road -> {destination_name} access gate",
             "estimated_transit_time_seconds": 90,
             "obstacles": "Clear (Campus security cleared vehicular corridor)"
         }
@@ -163,7 +163,7 @@ class CampusMCPTools:
 
     def create_alert(self, incident_type: str, location: str, severity: str) -> Dict[str, Any]:
         """MCP Tool: Prepares draft emergency broadcast messages for multi-channel distribution."""
-        msg = f"EMERGENCY NOTICE [VIGNAN UNIVERSITY]: {severity.upper()} severity {incident_type.upper()} incident reported at {location}. Follow safety warden directions and avoid the area."
+        msg = f"EMERGENCY NOTICE [AITAM DISASTER RESPONSE]: {severity.upper()} severity {incident_type.upper()} incident reported at {location}. Follow responder directions and avoid the area."
         return {
             "sms_template": msg,
             "push_notification_title": f"🚨 Campus Emergency: {location}",

@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from backend.database.models import IncidentDB, ResponsePlanDB
+from backend.database.models import DepartmentResponseDB, IncidentDB, ResponsePlanDB
 from backend.models.incident import IncidentStatus
 from backend.models.response import ResponsePlanRead, ApprovalStatus
 from backend.graph.workflow import run_emergency_workflow
@@ -27,7 +27,7 @@ class ResponseService:
     Combines:
     - Incident Report details
     - Multi-Agent Recommendations (Security, Medical, Transport, Communication)
-    - MCP Grounded Campus Resources
+    - MCP Grounded Response Resources
     Generates structured, auditable response plans requiring Human-In-The-Loop approval.
     """
 
@@ -184,7 +184,7 @@ class ResponseService:
         self,
         plan_id: str,
         decision: str,
-        operator_name: str = "Campus Safety Commander",
+        operator_name: str = "AITAM Response Commander",
         notes: Optional[str] = None,
         db: Session = None
     ) -> ResponsePlanDB:
@@ -193,6 +193,12 @@ class ResponseService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Response Plan '{plan_id}' not found."
+            )
+
+        if (plan.approval_status or "pending").lower() != "pending":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This response plan has already reached a final approval state.",
             )
 
         decision_clean = decision.lower().strip()
@@ -222,6 +228,24 @@ class ResponseService:
                 incident.current_step = f"Response plan rejected by {operator_name}."
                 incident.next_action = "Re-assess emergency parameters or prepare alternate plan."
             incident.updated_at = now
+
+            if is_approved:
+                # Approval is the authorization boundary for department work.
+                # Create idempotent, department-scoped tasks immediately so
+                # each required unit receives only its own operational alert.
+                from backend.services.assignment_service import create_required_assignments
+                existing_assignment_count = db.query(DepartmentResponseDB).filter(DepartmentResponseDB.incident_id == incident.incident_id).count()
+                required_assignments = create_required_assignments(
+                    incident, db, actor=operator_name
+                )
+                if existing_assignment_count and not required_assignments:
+                    from backend.services.assignment_service import notify_replan_approval
+                    notify_replan_approval(incident, plan.plan_id, db, actor=operator_name)
+                incident.next_action = "Approved department tasks are dispatched; teams must acknowledge and update status."
+            else:
+                required_assignments = []
+        else:
+            required_assignments = []
 
         db.commit()
         db.refresh(plan)
@@ -259,6 +283,20 @@ class ResponseService:
         # and matches the frontend contract used by the 3D workflow. Rejections
         # already emit the canonical 'approval_rejected' above.
         if is_approved:
+            event_engine.publish_event(
+                event_name="department_tasks_dispatched",
+                incident_id=plan.incident_id,
+                payload={
+                    "event_name": "department_tasks_dispatched",
+                    "event": "department_tasks_dispatched",
+                    "plan_id": plan.plan_id,
+                    "departments": [item.department for item in required_assignments],
+                    "assignment_ids": [item.id for item in required_assignments],
+                    "status": "notified",
+                    "message": "Approved department-scoped response tasks are available.",
+                },
+                db=None,
+            )
             event_engine.publish_event(
                 event_name="approval_approved",
                 incident_id=plan.incident_id,

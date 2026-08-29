@@ -22,7 +22,7 @@ def _department_token(client, email, department):
 
 
 def _citizen_token(client):
-    response = client.post("/api/v1/auth/user/login", json={"email": "student@vignan.ac.in", "phone": "9000000000"})
+    response = client.post("/api/v1/auth/user/login", json={"email": "community@aitam.local", "phone": "9000000000"})
     assert response.status_code == 200, response.text
     return response.json()["token"]
 
@@ -65,8 +65,8 @@ def test_assignment_creation_and_idempotency(client, db_session):
 def test_operator_visibility_and_department_isolation(client, db_session):
     incident_id = _create(client, db_session)
     operator = _operator_token(client)
-    medical = _department_token(client, "medical@vignan.ac.in", "MEDICAL")
-    security = _department_token(client, "security@vignan.ac.in", "SECURITY")
+    medical = _department_token(client, "medical@aitam.local", "MEDICAL")
+    security = _department_token(client, "security@aitam.local", "SECURITY")
     assert len(client.get(f"/api/v1/incidents/{incident_id}/assignments", headers=_auth(operator)).json()) == 2
     assert [row["department"] for row in client.get(f"/api/v1/incidents/{incident_id}/assignments", headers=_auth(medical)).json()] == ["MEDICAL"]
     assert [row["department"] for row in client.get(f"/api/v1/incidents/{incident_id}/assignments", headers=_auth(security)).json()] == ["SECURITY"]
@@ -74,8 +74,8 @@ def test_operator_visibility_and_department_isolation(client, db_session):
 
 def test_accept_decline_and_exact_lifecycle(client, db_session):
     incident_id = _create(client, db_session)
-    medical = _department_token(client, "medical@vignan.ac.in", "MEDICAL")
-    security = _department_token(client, "security@vignan.ac.in", "SECURITY")
+    medical = _department_token(client, "medical@aitam.local", "MEDICAL")
+    security = _department_token(client, "security@aitam.local", "SECURITY")
     headers = _auth(medical)
     assert client.post(f"/api/v1/incidents/{incident_id}/assignments/MEDICAL/accept", headers=headers).json()["status"] == "ACCEPTED"
     assert client.post(f"/api/v1/incidents/{incident_id}/assignments/MEDICAL/team-assigned", headers=headers, json={"resource_ids": ["AMB-001"]}).json()["status"] == "TEAM_ASSIGNED"
@@ -87,7 +87,7 @@ def test_accept_decline_and_exact_lifecycle(client, db_session):
 
 def test_invalid_transitions_are_rejected(client, db_session):
     incident_id = _create(client, db_session, ("MEDICAL",))
-    medical = _auth(_department_token(client, "medical@vignan.ac.in", "MEDICAL"))
+    medical = _auth(_department_token(client, "medical@aitam.local", "MEDICAL"))
     assert client.post(f"/api/v1/incidents/{incident_id}/assignments/MEDICAL/en-route", headers=medical).status_code == 409
     assert client.post(f"/api/v1/incidents/{incident_id}/assignments/MEDICAL/completed", headers=medical).status_code == 409
     client.post(f"/api/v1/incidents/{incident_id}/assignments/MEDICAL/accept", headers=medical)
@@ -96,7 +96,7 @@ def test_invalid_transitions_are_rejected(client, db_session):
 
 def test_unauthorized_department_and_citizen_are_blocked(client, db_session):
     incident_id = _create(client, db_session, ("MEDICAL",))
-    security = _auth(_department_token(client, "security@vignan.ac.in", "SECURITY"))
+    security = _auth(_department_token(client, "security@aitam.local", "SECURITY"))
     citizen = _auth(_citizen_token(client))
     assert client.post(f"/api/v1/incidents/{incident_id}/assignments/MEDICAL/accept", headers=security).status_code == 403
     assert client.get(f"/api/v1/incidents/{incident_id}/assignments", headers=citizen).status_code == 403
@@ -111,7 +111,7 @@ def test_events_and_audit_include_assignment_context(client, db_session, monkeyp
         captured.append((event_name, incident_id, dict(payload)))
         return original(event_name, incident_id, payload, db=db)
     monkeypatch.setattr(event_engine, "publish_event", capture)
-    medical = _auth(_department_token(client, "medical@vignan.ac.in", "MEDICAL"))
+    medical = _auth(_department_token(client, "medical@aitam.local", "MEDICAL"))
     assert client.post(f"/api/v1/incidents/{incident_id}/assignments/MEDICAL/accept", headers=medical).status_code == 200
     assert any(name == "dept_assignment_accepted" and payload["department"] == "MEDICAL" and payload["status"] == "ACCEPTED" for name, iid, payload in captured if iid == incident_id)
     logs = db_session.query(AuditLogDB).filter_by(incident_id=incident_id, action_type="dept_assignment_accepted").all()
@@ -120,8 +120,8 @@ def test_events_and_audit_include_assignment_context(client, db_session, monkeyp
 
 def test_notifications_are_scoped_and_read_state_is_real(client, db_session):
     incident_id = _create(client, db_session, ("MEDICAL", "SECURITY"))
-    medical = _department_token(client, "medical@vignan.ac.in", "MEDICAL")
-    security = _department_token(client, "security@vignan.ac.in", "SECURITY")
+    medical = _department_token(client, "medical@aitam.local", "MEDICAL")
+    security = _department_token(client, "security@aitam.local", "SECURITY")
     medical_rows = client.get("/api/v1/notifications", headers=_auth(medical)).json()
     security_rows = client.get("/api/v1/notifications", headers=_auth(security)).json()
     assert medical_rows and all(row["department"] == "MEDICAL" for row in medical_rows if row["incident_id"] == incident_id)
@@ -159,9 +159,9 @@ def test_approved_dispatch_creates_real_required_assignments(client):
     assert dispatched.status_code == 200, dispatched.text
     rows = client.get(f"/api/v1/incidents/{incident_id}/assignments", headers=operator)
     assert rows.status_code == 200
-    # Existing routing adds COMMUNICATION for high-severity campus-wide alerts;
-    # Phase 6 must honor that backend configuration rather than inventing a UI list.
-    assert {row["department"] for row in rows.json()} == {"MEDICAL", "TRANSPORT", "SECURITY", "COMMUNICATION"}
+    # High-impact accident routing includes the dedicated rescue scope and
+    # communication escalation; the API remains the source of truth.
+    assert {row["department"] for row in rows.json()} == {"MEDICAL", "SEARCH_AND_RESCUE", "TRANSPORT", "SECURITY", "COMMUNICATION"}
     assert {row["status"] for row in rows.json()} == {"NOTIFIED"}
 
 
@@ -175,10 +175,10 @@ def test_full_lifecycle_is_backend_driven_and_operator_sees_every_department(cli
     incident_id = _create(client, db_session, ("MEDICAL", "SECURITY", "TRANSPORT", "FIRE"))
     operator = _auth(_operator_token(client))
     departments = {
-        "MEDICAL": _auth(_department_token(client, "medical@vignan.ac.in", "MEDICAL")),
-        "SECURITY": _auth(_department_token(client, "security@vignan.ac.in", "SECURITY")),
-        "TRANSPORT": _auth(_department_token(client, "transport@vignan.ac.in", "TRANSPORT")),
-        "FIRE": _auth(_department_token(client, "fire@vignan.ac.in", "FIRE")),
+        "MEDICAL": _auth(_department_token(client, "medical@aitam.local", "MEDICAL")),
+        "SECURITY": _auth(_department_token(client, "security@aitam.local", "SECURITY")),
+        "TRANSPORT": _auth(_department_token(client, "transport@aitam.local", "TRANSPORT")),
+        "FIRE": _auth(_department_token(client, "fire@aitam.local", "FIRE")),
     }
     captured = []
     original = event_engine.publish_event
@@ -243,7 +243,7 @@ def test_full_lifecycle_is_backend_driven_and_operator_sees_every_department(cli
 def test_security_lifecycle_never_changes_medical_or_transport(client, db_session):
     """Regression: each DepartmentResponseDB row is an independent state machine."""
     incident_id = _create(client, db_session, ("SECURITY", "MEDICAL", "TRANSPORT"))
-    security = _auth(_department_token(client, "security@vignan.ac.in", "SECURITY"))
+    security = _auth(_department_token(client, "security@aitam.local", "SECURITY"))
     operator = _auth(_operator_token(client))
 
     for action, payload in (

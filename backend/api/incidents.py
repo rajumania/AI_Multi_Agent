@@ -2,7 +2,8 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
@@ -35,6 +36,7 @@ from backend.services.workflow_cache import workflow_cache
 from backend.services.response_service import response_service
 from backend.services.llm_service import llm_service
 from backend.config import settings
+from backend.api.evidence import validate_reference_access
 
 router = APIRouter(prefix="/api/v1/incidents", tags=["Incidents"])
 
@@ -52,6 +54,7 @@ def create_incident(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     principal: Optional[Principal] = Depends(get_optional_principal),
+    client_operation_id: Optional[str] = Header(default=None, alias="X-Client-Operation-Id"),
 ):
     """
     Intake a new emergency incident report.
@@ -63,6 +66,21 @@ def create_incident(
     departments are recorded so department dashboards and the WebSocket layer can
     resolve the incident's audience.
     """
+    # Offline clients replay the same operation after reconnect. Return the
+    # original row instead of creating a second emergency when the first
+    # request reached the server but its response was lost.
+    # Direct internal callers predate this optional header and receive the
+    # FastAPI ``Header`` marker as the default positional value.
+    operation_id = client_operation_id.strip()[:100] if isinstance(client_operation_id, str) else None
+    if principal is not None:
+        validate_reference_access(incident_in.image_url, principal)
+    if operation_id:
+        existing = db.query(IncidentDB).filter(IncidentDB.client_operation_id == operation_id).first()
+        if existing is not None:
+            if principal is not None and getattr(principal, "is_user", False) and str(existing.user_id or "") != str(principal.id):
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Client operation ID is already in use.")
+            return existing
+
     now = datetime.now(timezone.utc)
     incident_id = generate_incident_id()
     intake_started = perf_start("intake", incident_id=incident_id)
@@ -78,18 +96,21 @@ def create_incident(
     required_departments = departments_for_incident(
         incident_in.incident_type.value,
         incident_in.severity.value,
+        incident_in.disaster_type.value if incident_in.disaster_type else None,
     )
 
     db_incident = IncidentDB(
         incident_id=incident_id,
         description=incident_in.description.strip(),
         incident_type=incident_in.incident_type.value,
+        disaster_type=incident_in.disaster_type.value if incident_in.disaster_type else None,
         category=incident_in.incident_type.value,
         location=incident_in.location.strip(),
         severity=incident_in.severity.value,
         injured_count=incident_in.injured_count,  # Strictly None if unknown
         evidence_source=incident_in.evidence_source,
         reported_by=incident_in.reported_by,
+        image_url=incident_in.image_url,
         user_id=owner_user_id,
         latitude=incident_in.latitude,
         longitude=incident_in.longitude,
@@ -98,10 +119,21 @@ def create_incident(
         ai_provider_status="PENDING",
         created_at=now,
         updated_at=now,
+        client_operation_id=operation_id,
     )
 
     db.add(db_incident)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent replay may win the unique-key race between the lookup
+        # above and commit. Resolve it as an idempotent retry.
+        db.rollback()
+        if operation_id:
+            existing = db.query(IncidentDB).filter(IncidentDB.client_operation_id == operation_id).first()
+            if existing is not None:
+                return existing
+        raise
     db.refresh(db_incident)
 
     # Audit Logging
@@ -127,8 +159,12 @@ def create_incident(
             "description": f"Incident reported at {db_incident.location}.",
             "incident_description": db_incident.description,
             "incident_type": db_incident.incident_type,
+            "disaster_type": db_incident.disaster_type,
             "severity": db_incident.severity,
             "location": db_incident.location,
+            "region_id": db_incident.region_id,
+            "zone_id": db_incident.zone_id,
+            "image_url": db_incident.image_url,
             "injured_count": db_incident.injured_count,
             "status": db_incident.status,
             "created_at": db_incident.created_at.isoformat(),
@@ -155,6 +191,27 @@ def run_automatic_incident_pipeline(incident_id: str) -> None:
     try:
         incident = db.query(IncidentDB).filter(IncidentDB.incident_id == incident_id).first()
         if incident is None:
+            return
+
+        # Disaster-domain reports enter the same event-fusion boundary as
+        # sensor events. Legacy incident-only callers keep the established
+        # assessment path below for compatibility.
+        if incident.disaster_type or incident.zone_id or incident.region_id or (incident.latitude is not None and incident.longitude is not None):
+            from backend.services.disaster_intelligence_service import trigger_disaster_intelligence
+            trigger_disaster_intelligence(
+                db,
+                source="community",
+                location=incident.location,
+                description=incident.description,
+                zone_id=incident.zone_id,
+                region_id=incident.region_id,
+                latitude=incident.latitude,
+                longitude=incident.longitude,
+                disaster_type=incident.disaster_type,
+                event_id=incident.incident_id,
+                user_id=incident.user_id,
+                image_url=incident.image_url,
+            )
             return
 
         incident.status = IncidentStatus.ANALYZING.value
@@ -257,7 +314,9 @@ def _principal_can_view_incident(incident: IncidentDB, principal: Optional[Princ
       * Department staff -> only incidents routed to their own department.
       * Any other authenticated actor -> nothing (fail closed).
     """
-    if principal is None or principal.is_privileged:
+    if principal is None:
+        return settings.ALLOW_ANONYMOUS_ADMIN
+    if principal.is_privileged:
         return True
     if principal.is_user:
         return incident.user_id is not None and str(incident.user_id) == str(principal.id)
@@ -559,7 +618,7 @@ def orchestrate_incident(
     if db_incident.injured_count is None:
         db_incident.injured_count = final_state.get("injured_count")
     db_incident.required_departments = json.dumps(
-        departments_for_incident(db_incident.incident_type, db_incident.severity)
+        departments_for_incident(db_incident.incident_type, db_incident.severity, db_incident.disaster_type)
     )
 
     db_incident.status = IncidentStatus.RESPONSE_PLANNING.value

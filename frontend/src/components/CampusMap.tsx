@@ -1,53 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { Navigation, RefreshCw } from 'lucide-react';
-import { CampusLocation, CampusResource, Incident, TransportTracking } from '../types';
+import { CampusLocation, CampusResource, Incident, LiveEvent, TransportTracking } from '../types';
 import { OperatorLocation } from './RealOperationsControls';
-import { api, appendWsToken } from '../services/api';
+import { api } from '../services/api';
 
-// Geocoding helper for Vignan University blocks
-export const getIncidentCoords = (location: string): [number, number] => {
-  const loc = (location || '').toLowerCase();
-  if (loc.includes('u-block') || loc.includes('cse') || loc.includes('computing') || loc.includes('it block')) {
-    return [16.2340, 80.5520];
-  }
-  if (loc.includes('a-block') || loc.includes('admin') || loc.includes('registrar') || loc.includes('vc office')) {
-    return [16.2330, 80.5510];
-  }
-  if (loc.includes('h-block') || loc.includes('biotech') || loc.includes('science') || loc.includes('chem')) {
-    return [16.2345, 80.5505];
-  }
-  if (loc.includes('v-block') || loc.includes('mech') || loc.includes('workshop') || loc.includes('civil')) {
-    return [16.2325, 80.5525];
-  }
-  if (loc.includes('library') || loc.includes('ntr')) {
-    return [16.2335, 80.5508];
-  }
-  if (loc.includes('auditorium') || loc.includes('convocation') || loc.includes('vignan vihar') || loc.includes('oat')) {
-    return [16.2350, 80.5518];
-  }
-  if (loc.includes('sports') || loc.includes('stadium') || loc.includes('arena') || loc.includes('ground')) {
-    return [16.2355, 80.5495];
-  }
-  if (loc.includes('sac') || loc.includes('cafeteria') || loc.includes('canteen') || loc.includes('food court')) {
-    return [16.2338, 80.5500];
-  }
-  if (loc.includes('hostel') || loc.includes('mahalakshmi') || loc.includes('vasishta') || loc.includes('valmiki') || loc.includes('dorm')) {
-    return [16.2315, 80.5535];
-  }
-  if (loc.includes('gate') || loc.includes('entrance') || loc.includes('vadlamudi')) {
-    return [16.2320, 80.5490];
-  }
-  if (loc.includes('medical') || loc.includes('health') || loc.includes('first aid')) {
-    return [16.2332, 80.5502];
-  }
-  if (loc.includes('pharmacy') || loc.includes('bio-nest')) {
-    return [16.2348, 80.5530];
-  }
-  if (loc.includes('transport') || loc.includes('bus') || loc.includes('parking') || loc.includes('depot')) {
-    return [16.2310, 80.5495];
-  }
-  return [16.2334, 80.5513];
+// Geocoding helper for the existing response-area location catalog
+export const getIncidentCoords = (_location: string): [number, number] => {
+  // Exact reporter coordinates and the backend's verified location catalog
+  // take precedence. This fallback is intentionally only the AITAM anchor.
+  return [18.56517, 84.19587];
 };
 
 function resolveIncidentPosition(incident: Incident, locations: CampusLocation[]): { coords: [number, number]; source: 'EXACT' | 'CAMPUS_CATALOG' | 'APPROXIMATE' } {
@@ -66,6 +28,8 @@ interface CampusMapProps {
   activeIncidentId?: string;
   selectedResourceId?: string;
   operatorLocation?: OperatorLocation | null;
+  /** Events from the command shell's single authenticated WebSocket. */
+  liveEvents?: LiveEvent[];
 }
 
 export const CampusMap: React.FC<CampusMapProps> = ({
@@ -73,7 +37,8 @@ export const CampusMap: React.FC<CampusMapProps> = ({
   onSelectIncident,
   activeIncidentId,
   selectedResourceId,
-  operatorLocation
+  operatorLocation,
+  liveEvents = [],
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -87,13 +52,14 @@ export const CampusMap: React.FC<CampusMapProps> = ({
   const [filterType, setFilterType] = useState<string>('all');
   const [mapLayer, setMapLayer] = useState<'satellite' | 'standard' | 'navigation' | 'terrain'>('satellite');
   const [loadingResources, setLoadingResources] = useState<boolean>(true);
-  const [mouseCoords, setMouseCoords] = useState<{ lat: number; lng: number }>({ lat: 16.2334, lng: 80.5513 });
+  const [mouseCoords, setMouseCoords] = useState<{ lat: number; lng: number }>({ lat: 18.56517, lng: 84.19587 });
 
   const tileLayerRef = useRef<L.LayerGroup | null>(null);
 
   // Real-time active states
   const [movingVehicles, setMovingVehicles] = useState<{ [rid: string]: any }>({});
   const [activeRoutes, setActiveRoutes] = useState<{ [rid: string]: { coordinates: [number, number][], status: 'active' | 'blocked' } }>({});
+  const lastHandledEventRef = useRef<string | null>(null);
   
   // Static preview route before dispatch
   const [staticRoute, setStaticRoute] = useState<{ coordinates: [number, number][], distance: number, eta: number } | null>(null);
@@ -185,7 +151,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
     const map = L.map(mapContainerRef.current, {
-      center: [16.2334, 80.5513],
+      center: [18.56517, 84.19587],
       zoom: 16,
       zoomControl: true,
     });
@@ -247,34 +213,32 @@ export const CampusMap: React.FC<CampusMapProps> = ({
   }, [mapLayer]);
 
 
-  // 2. Connect to real-time events WebSocket
+  // 2. Consume the command shell's existing real-time event stream. The App
+  // owns the single authenticated /api/v1/events/ws connection; this map must
+  // not create a second socket for the same browser view.
   useEffect(() => {
-    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsHost = window.location.port ? `${window.location.hostname}:8000` : window.location.host;
-    const wsUrl = appendWsToken(`${wsProto}//${wsHost}/api/v1/events/ws`);
-    
-    console.log(`Connecting to WebSocket: ${wsUrl}`);
-    const ws = new WebSocket(wsUrl);
+    const data = liveEvents[0];
+    if (!data) return;
+    const eventKey = `${data.event_name}:${data.timestamp || ''}:${data.resource_id || ''}:${data.route_version || ''}`;
+    if (lastHandledEventRef.current === eventKey) return;
+    lastHandledEventRef.current = eventKey;
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('Real-time map event:', data);
+    try {
 
         if (['route_selected', 'transport_route_created', 'transport_route_updated'].includes(data.event_name)) {
           setActiveRoutes(prev => ({
             ...prev,
-            [data.resource_id]: {
-              coordinates: data.coordinates,
+            [data.resource_id as string]: {
+              coordinates: data.coordinates as [number, number][],
               status: 'active'
             }
           }));
           setMovingVehicles(prev => {
-            const current = prev[data.resource_id];
+            const current = prev[data.resource_id as string];
             if (!current) return prev;
             return {
               ...prev,
-              [data.resource_id]: {
+              [data.resource_id as string]: {
                 ...current,
                 etaSeconds: data.eta_seconds,
                 distanceRemaining: data.distance_meters != null ? data.distance_meters / 1000 : current.distanceRemaining,
@@ -285,11 +249,11 @@ export const CampusMap: React.FC<CampusMapProps> = ({
           });
         } else if (data.event_name === 'route_blocked') {
           setActiveRoutes(prev => {
-            const current = prev[data.resource_id];
+            const current = prev[data.resource_id as string];
             if (!current) return prev;
             return {
               ...prev,
-              [data.resource_id]: {
+              [data.resource_id as string]: {
                 ...current,
                 status: 'blocked'
               }
@@ -300,22 +264,22 @@ export const CampusMap: React.FC<CampusMapProps> = ({
           setActiveRoutes(prev => {
             const next = { ...prev };
             // Mark previous as blocked
-            if (next[data.resource_id]) {
-              next[data.resource_id].status = 'blocked';
+            if (next[data.resource_id as string]) {
+              next[data.resource_id as string].status = 'blocked';
             }
             next[`${data.resource_id}_new`] = {
-              coordinates: data.coordinates,
+              coordinates: data.coordinates as [number, number][],
               status: 'active'
             };
             return next;
           });
         } else if (data.event_name === 'transport_eta_updated') {
           setMovingVehicles(prev => {
-            const current = prev[data.resource_id];
+            const current = prev[data.resource_id as string];
             if (!current) return prev;
             return {
               ...prev,
-              [data.resource_id]: {
+              [data.resource_id as string]: {
                 ...current,
                 etaSeconds: data.eta_seconds,
                 distanceRemaining: data.distance_meters != null ? data.distance_meters / 1000 : current.distanceRemaining,
@@ -335,7 +299,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
 
           setMovingVehicles(prev => ({
             ...prev,
-            [data.resource_id]: {
+            [data.resource_id as string]: {
               resourceId: data.resource_id,
               latitude: data.latitude,
               longitude: data.longitude,
@@ -343,7 +307,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
               distanceRemaining: data.distance_remaining,
               etaSeconds: data.eta_seconds,
               routeCoordinates: data.route_coordinates,
-              source: data.source || (data.event_name === 'vehicle_location_updated' ? 'SIMULATED' : 'UNAVAILABLE'),
+              source: data.source || 'UNAVAILABLE',
               routeVersion: data.route_version,
               timestamp: data.timestamp,
             }
@@ -352,30 +316,21 @@ export const CampusMap: React.FC<CampusMapProps> = ({
           // Clear active routing lines and overlays
           setMovingVehicles(prev => {
             const next = { ...prev };
-            delete next[data.resource_id];
+            delete next[data.resource_id as string];
             return next;
           });
           setActiveRoutes(prev => {
             const next = { ...prev };
-            delete next[data.resource_id];
+            delete next[data.resource_id as string];
             delete next[`${data.resource_id}_new`];
             return next;
           });
-          fetchResources();
+          void fetchResources();
         }
       } catch (e) {
-        console.error('Error handling WebSocket message:', e);
+        console.error('Error handling real-time map event:', e);
       }
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, []);
+  }, [liveEvents, fetchResources]);
 
   // 3. Static preview route calculation
   useEffect(() => {
@@ -612,18 +567,17 @@ export const CampusMap: React.FC<CampusMapProps> = ({
       `);
     });
 
-    // Plot the operator/device position with an explicit REAL or DEMO label.
+    // Plot the operator/device position only when supplied by real browser GPS.
     if (operatorLocation) {
-      const isReal = operatorLocation.source === 'REAL';
       const operatorIcon = L.divIcon({
-        html: `<div style="background:${isReal ? '#2563eb' : '#d97706'};color:#fff;border:2px solid #fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,.35)">${isReal ? 'GPS' : 'D'}</div>`,
+        html: `<div style="background:#2563eb;color:#fff;border:2px solid #fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,.35)">GPS</div>`,
         className: 'operator-location-pin',
         iconSize: [30, 30],
         iconAnchor: [15, 15],
       });
       L.marker([operatorLocation.latitude, operatorLocation.longitude], { icon: operatorIcon })
         .addTo(markersLayer)
-        .bindTooltip(`${isReal ? 'REAL GPS' : 'DEMO GPS — SIMULATED'} • ${operatorLocation.latitude.toFixed(6)}, ${operatorLocation.longitude.toFixed(6)}`);
+        .bindTooltip(`REAL GPS • ${operatorLocation.latitude.toFixed(6)}, ${operatorLocation.longitude.toFixed(6)}`);
     }
 
     // D. Draw Static Preview Route (if selected resource route is not yet active)
@@ -727,7 +681,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
             <span>Sync</span>
           </button>
           <span className="panel-tag" style={{ fontSize: '0.65rem', background: '#0284c7', color: 'white', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-            VFSTR CAMPUS (Vadlamudi)
+            AITAM RESPONSE AREA
           </span>
         </div>
       </div>
@@ -816,12 +770,12 @@ export const CampusMap: React.FC<CampusMapProps> = ({
           minWidth: '130px'
         }}>
           <strong style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '3px', marginBottom: '3px', fontSize: '0.72rem' }}>Map Legend</strong>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>BUILD <span style={{ color: '#64748b' }}>Campus Building</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>BUILD <span style={{ color: '#64748b' }}>Vulnerable Zone</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🔴 <span style={{ color: '#64748b' }}>Incident</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🚑 <span style={{ color: '#64748b' }}>Ambulance</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🛡️ <span style={{ color: '#64748b' }}>Security Squad</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🏥 <span style={{ color: '#64748b' }}>Medical Unit</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🚐 <span style={{ color: '#64748b' }}>Campus Vehicle</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🚐 <span style={{ color: '#64748b' }}>Emergency Vehicle</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🏠 <span style={{ color: '#64748b' }}>Muster Shelter</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '14px' }}>
             <div style={{ width: '16px', height: '3px', background: '#3b82f6', borderStyle: 'dashed', borderWidth: '1px' }}></div>
@@ -871,7 +825,7 @@ export const CampusMap: React.FC<CampusMapProps> = ({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 <div><strong>Asset:</strong> <span style={{ color: '#38bdf8', fontWeight: 700 }}>{mv.resourceId}</span> {res ? `(${res.name})` : ''}</div>
-                <div><strong>Source:</strong> {res?.location || 'Campus Base'}</div>
+                <div><strong>Source:</strong> {res?.location || 'Response Base'}</div>
                 <div><strong>Destination:</strong> <span style={{ color: '#fca5a5' }}>{inc?.location || 'Emergency Site'}</span></div>
                 <div><strong>ETA:</strong> <span style={{ color: '#4ade80', fontWeight: 700 }}>{typeof mv.etaSeconds === 'number' ? `${Math.floor(mv.etaSeconds / 60)}m ${Math.round(mv.etaSeconds % 60)}s` : 'ETA unavailable'}</span></div>
                 <div><strong>Distance:</strong> <span style={{ color: '#fde047', fontWeight: 700 }}>{typeof mv.distanceRemaining === 'number' ? `${mv.distanceRemaining.toFixed(2)} km` : 'Unavailable'}</span></div>

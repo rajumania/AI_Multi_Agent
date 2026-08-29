@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// CampusFlow AI — role & department helpers (Increment 2)
+// AITAM Disaster Response AI — role & department helpers (Increment 2)
 //
 // PURE, DOM-FREE module. It mirrors the backend's role/department constants
 // (backend/services/auth_service.py + backend/services/departments.py) so the
@@ -25,23 +25,27 @@ export const DEPARTMENT_ROLES: readonly string[] = [ROLE_DEPARTMENT, ROLE_DEPART
 
 // Departments — must match backend departments.py exactly.
 export const DEPARTMENTS = [
-  'SECURITY',
   'MEDICAL',
+  'SEARCH_AND_RESCUE',
+  'FIRE',
+  'SECURITY',
   'TRANSPORT',
   'COMMUNICATION',
-  'FIRE',
   'FACILITIES',
+  'SHELTER',
 ] as const;
 
 export type DepartmentCode = (typeof DEPARTMENTS)[number];
 
 export const DEPARTMENT_LABELS: Record<DepartmentCode, string> = {
-  SECURITY: 'Campus Security',
   MEDICAL: 'Medical & Health',
+  SEARCH_AND_RESCUE: 'Search & Rescue',
+  FIRE: 'Fire & Safety',
+  SECURITY: 'Security / Public Safety',
   TRANSPORT: 'Transport & Logistics',
   COMMUNICATION: 'Communications',
-  FIRE: 'Fire & Safety',
   FACILITIES: 'Facilities & Maintenance',
+  SHELTER: 'Shelter & Relief',
 };
 
 // The authenticated principal as the frontend sees it. Fields are optional
@@ -95,7 +99,7 @@ export function roleDisplayName(user: AuthUser | null | undefined): string {
       return 'Safety Operations';
     case ROLE_USER:
     case 'student':
-      return 'Campus Member';
+      return 'Community';
     case ROLE_DEPARTMENT:
     case ROLE_DEPARTMENT_HEAD: {
       const label = departmentLabel(user.department);

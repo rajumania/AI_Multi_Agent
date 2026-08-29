@@ -7,8 +7,8 @@ from backend.models.incident import (
 )
 
 
-SUPERVISOR_SYSTEM_PROMPT = """You are the Lead Emergency Intake & Classification Supervisor AI for CAMPUSFLOW AI.
-Your duty is to rapidly analyze campus emergency reports, classify the incident, assess severity, extract location, and summarize the situation with extreme precision.
+SUPERVISOR_SYSTEM_PROMPT = """You are the Lead Emergency Intake & Classification Supervisor AI for AITAM Disaster Response AI.
+Your duty is to rapidly analyze disaster and emergency reports, classify the incident, assess severity, extract location, and summarize the situation with extreme precision.
 
 CRITICAL SAFETY RULES (VIOLATION IS STRICTLY PROHIBITED):
 1. NEVER INVENT OR FABRICATE FACTS. Do NOT hallucinate injured people, nonexistent locations, or unconfirmed hazards.
@@ -22,8 +22,8 @@ CRITICAL SAFETY RULES (VIOLATION IS STRICTLY PROHIBITED):
 4. RECOMMENDED AGENTS:
    - "security": for intruders, crowd events, fires, theft, hazardous perimeter control
    - "medical": for injuries, health emergencies, medical triage, ambulance coordination
-   - "transport": for evacuation, traffic rerouting, vehicle accidents, campus transport dispatch
-   - "communication": for emergency broadcasts, student/staff alerts, command briefings
+   - "transport": for evacuation, traffic rerouting, vehicle accidents, and response transport dispatch
+   - "communication": for emergency broadcasts, community/staff alerts, and command briefings
    - "fire": for fire, smoke, explosion, or thermal hazards requiring suppression/containment
    - "facilities": for electrical, plumbing, structural, HVAC, elevator, or utility hazards
 
@@ -31,7 +31,7 @@ Output MUST be a single valid JSON object with the following schema:
 {
   "incident_type": "fire" | "chemical" | "medical" | "security" | "accident" | "weather" | "crowd" | "facility" | "other" | "unknown",
   "severity": "low" | "medium" | "high" | "critical" | "unknown",
-  "location": "extracted campus location or building name",
+  "location": "extracted response-area location or building name",
   "injured_count": <integer or null>,
   "summary": "concise, factual summary of the incident and injury confirmation status",
   "confidence": <float between 0.0 and 1.0>,
@@ -122,9 +122,9 @@ class SupervisorAgent:
             severity = SeverityLevel.MEDIUM
 
         # 3. Location Extraction
-        location = data.get("location") or reported_location or "Campus Premises"
+        location = data.get("location") or reported_location or "Response Area"
         if not location or str(location).strip().lower() in ("unknown", "null", "none"):
-            location = reported_location or "Campus Grounds"
+            location = reported_location or "Response Area"
 
         # 4. Strict Safety on Injured Count (Preserve null if unknown!)
         raw_injured = data.get("injured_count")
@@ -158,7 +158,7 @@ class SupervisorAgent:
             if count_match:
                 raw_count = count_match.group(1)
                 injured_count = number_words.get(raw_count, int(raw_count) if raw_count.isdigit() else None)
-            elif re.search(r"\b(?:rider|cyclist|person|student|passenger)\b[^.]{0,50}\b(?:injury|injured|hurt|wound)\b", raw_desc_lower):
+            elif re.search(r"\b(?:rider|cyclist|person|passenger|community member)\b[^.]{0,50}\b(?:injury|injured|hurt|wound)\b", raw_desc_lower):
                 injured_count = 1
 
         if incident_type is IncidentType.CHEMICAL:

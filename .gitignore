@@ -32,6 +32,9 @@ phase91-*.out
 # Generated voice audio
 backend/static/voice_audio/
 
+# Uploaded reporter evidence (runtime data, never source-controlled)
+/backend/storage/evidence/
+
 # Mem0 runtime configuration/telemetry state
 /backend/.mem0/
 

@@ -1,5 +1,5 @@
 """
-CampusFlow AI - MCP Resource Coordination Tools
+AITAM Disaster Response AI - MCP Resource Coordination Tools
 """
 from backend.mcp.tools.resources import query_resources
 from backend.mcp.tools.ambulances import find_available_ambulances

@@ -1,13 +1,13 @@
-"""Authentication API for CampusFlow AI.
+"""Authentication API for AITAM Disaster Response AI.
 
 Endpoints (all under /api/v1/auth):
 
   Legacy / command-center
-    POST /login              username + password        -> operator/admin token
+    POST /login              username + password        -> command/admin token
     POST /signup             username + password         -> citizen (role clamped)
 
   Citizen / user portal (Part 4: email + phone identity)
-    POST /user/register      email + phone + full_name   -> user token
+    POST /user/register      email + phone + full_name   -> community token
     POST /user/login         email + phone               -> user token
 
   Department staff (Part 5: email + password + department)
@@ -26,10 +26,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from backend.database.database import get_db
-from backend.database.models import UserDB, DepartmentUserDB
+from backend.database.models import UserDB, DepartmentUserDB, DepartmentDB
 from backend.api.deps import get_current_principal, get_optional_principal
 from backend.services.auth_service import (
     Principal,
@@ -63,40 +63,40 @@ SECRET_KEY = settings.AUTH_SECRET_KEY
 # --------------------------------------------------------------------------
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 class SignupRequest(BaseModel):
-    username: str
-    password: str
-    role: str = "user"  # requested role; clamped server-side (see signup)
-    full_name: str = ""
+    username: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=8, max_length=128)
+    role: str = Field(default="user", max_length=30)  # requested role; clamped server-side (see signup)
+    full_name: str = Field(default="", max_length=100)
 
 
 class UserRegisterRequest(BaseModel):
-    email: str
-    phone: str
-    full_name: str = ""
+    email: str = Field(..., min_length=3, max_length=120)
+    phone: str = Field(..., min_length=7, max_length=30)
+    full_name: str = Field(default="", max_length=100)
 
 
 class UserLoginRequest(BaseModel):
-    email: str
-    phone: str
+    email: str = Field(..., min_length=3, max_length=120)
+    phone: str = Field(..., min_length=7, max_length=30)
 
 
 class DepartmentLoginRequest(BaseModel):
-    email: str
-    password: str
-    department: str
+    email: str = Field(..., min_length=3, max_length=120)
+    password: str = Field(..., min_length=1, max_length=128)
+    department: str = Field(..., min_length=2, max_length=50)
 
 
 class DepartmentRegisterRequest(BaseModel):
-    email: str
-    password: str
-    department: str
-    full_name: str = ""
-    role: str = ROLE_DEPARTMENT
+    email: str = Field(..., min_length=3, max_length=120)
+    password: str = Field(..., min_length=8, max_length=128)
+    department: str = Field(..., min_length=2, max_length=50)
+    full_name: str = Field(default="", max_length=100)
+    role: str = Field(default=ROLE_DEPARTMENT, max_length=30)
 
 
 # --------------------------------------------------------------------------
@@ -192,7 +192,7 @@ def _issue_user_token(user: UserDB) -> dict:
 
 @router.post("/user/register")
 def user_register(payload: UserRegisterRequest, db: Session = Depends(get_db)):
-    """Register a campus community member (email + phone). Returns a session token."""
+    """Register a community member (email + phone). Returns a session token."""
     email = payload.email.strip().lower()
     phone = payload.phone.strip()
     if not email or not phone:
@@ -270,6 +270,9 @@ def department_login(payload: DepartmentLoginRequest, db: Session = Depends(get_
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This account is not registered to that department.",
         )
+    department_row = db.query(DepartmentDB).filter(DepartmentDB.code == dept).first()
+    if department_row is not None and department_row.status != "active":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This department is inactive.")
     if (staff.status or "active") != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is suspended.")
 
@@ -303,6 +306,9 @@ def department_register(
     dept = normalize_department(payload.department)
     if dept is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown department.")
+    department_row = db.query(DepartmentDB).filter(DepartmentDB.code == dept).first()
+    if department_row is not None and department_row.status != "active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Department is not active.")
     if db.query(DepartmentUserDB).filter(DepartmentUserDB.email == email).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
 

@@ -2,13 +2,13 @@ from typing import Dict, Any, List, Optional
 from backend.services.llm_service import llm_service
 
 
-COMMUNICATION_AGENT_SYSTEM_PROMPT = """You are the specialized Emergency Communications & Public Information Agent for CAMPUSFLOW AI.
-Your duty is to draft verified campus alerts, coordinator briefings, and public safety announcements.
+COMMUNICATION_AGENT_SYSTEM_PROMPT = """You are the specialized Emergency Communications & Public Information Agent for AITAM Disaster Response AI.
+Your duty is to draft verified disaster alerts, coordinator briefings, and public safety announcements.
 
 CRITICAL SAFETY RULES:
 1. NEVER BROADCAST UNVERIFIED FACTS OR CASUALTY ESTIMATES.
 2. IF INJURIES ARE UNCONFIRMED, STATE ONLY THAT EMERGENCY TEAMS ARE ON SCENE ASSESSING THE SITUATION.
-3. CLEARLY SPECIFY NOTIFICATION CHANNELS (e.g., SMS, App Push, Campus Coordinator Hotline).
+3. CLEARLY SPECIFY NOTIFICATION CHANNELS (e.g., SMS, App Push, Community Coordinator Hotline).
 
 Output JSON format:
 {
@@ -29,7 +29,7 @@ class CommunicationAgent:
     """
     Specialized Communication Agent:
     - Composes calibrated emergency broadcasts and alerts.
-    - Recommends communication channels (SMS, Push, Staff Hotline, Campus Web).
+    - Recommends communication channels (SMS, Push, Staff Hotline, Response Web).
     - Preserves factual boundaries without alarming or fabricating details.
     """
 
@@ -69,12 +69,12 @@ class CommunicationAgent:
         if is_high:
             channels.extend(["sms", "digital_signage"])
 
-        headline = f"CAMPUS ALERT: {incident_type.upper()} incident reported at {location}"
+        headline = f"AITAM ALERT: {incident_type.upper()} incident reported at {location}"
 
         if is_high:
             msg = (
                 f"Emergency teams are responding to an incident near {location}. "
-                f"Please avoid the area and follow directions from campus security stewards."
+                f"Please avoid the area and follow directions from public-safety responders."
             )
             priority = "urgent" if severity == "critical" else "high"
         else:
@@ -82,9 +82,9 @@ class CommunicationAgent:
             priority = "standard"
 
         actions = [
-            f"Prepare verified situation bulletin for Campus Emergency Operations Center.",
+            f"Prepare verified situation bulletin for the AITAM Emergency Operations Center.",
             f"Stage alert broadcast across: {', '.join(channels)}.",
-            f"Send real-time status update to campus security dispatcher."
+            f"Send real-time status update to the public-safety dispatcher."
         ]
 
         return {

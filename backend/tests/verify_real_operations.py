@@ -20,7 +20,7 @@ from backend.database.seed import seed_resources, seed_users
 
 def test_real_operations():
     print("==================================================")
-    print("CAMPUSFLOW AI — REAL OPERATIONS VERIFICATION TEST")
+    print("AITAM DISASTER RESPONSE AI — REAL OPERATIONS VERIFICATION TEST")
     print("==================================================")
 
     # 1. Database Init
@@ -49,7 +49,7 @@ def test_real_operations():
     print(f"  Push Provider Output: status={push_res.status.value}, count={push_res.recipient_count}")
 
     # Test Email Adapter
-    email_res = email_adapter.send_email(["security@vignan.ac.in"], "Test Alert", "Emergency test message")
+    email_res = email_adapter.send_email(["security@aitam.local"], "Test Alert", "Emergency test message")
     print(f"  Email Provider Output: status={email_res.status.value}")
 
     # Test Voice Audio TTS Generation (Capability A)

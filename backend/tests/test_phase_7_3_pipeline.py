@@ -69,12 +69,14 @@ def test_background_pipeline_uses_existing_fallback_and_stops_for_approval(clien
     assert incident["incident_type"] == "chemical"
     assert incident["injured_count"] == 2
 
-    plans = client.get(f"/api/v1/response-plans?incident_id={incident_id}").json()
-    assert len(plans) == 1
-    assert plans[0]["approval_status"] == "pending"
     operator = client.post("/api/v1/auth/login", json={"username": "admin", "password": "password123"})
     assert operator.status_code == 200, operator.text
     headers = {"Authorization": f"Bearer {operator.json()['token']}"}
+    plans_response = client.get(f"/api/v1/response-plans?incident_id={incident_id}", headers=headers)
+    assert plans_response.status_code == 200, plans_response.text
+    plans = plans_response.json()
+    assert len(plans) == 1
+    assert plans[0]["approval_status"] == "pending"
     assert client.get(f"/api/v1/incidents/{incident_id}/assignments", headers=headers).json() == []
     assert {"assessment_started", "incident_assessed", "response_plan_generated", "awaiting_human_authorization"}.issubset(emitted)
 

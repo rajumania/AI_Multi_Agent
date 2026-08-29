@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { LiveEvent } from '../types';
 import {
-  AGENT_ORDER,
+  CURRENT_AGENT_ORDER,
   getIncidentWorkflow,
   initialRealtimeState,
   reduceRealtime,
@@ -18,7 +18,7 @@ import {
   type IncidentWorkflowState,
   type RealtimeWorkflowState,
 } from '../realtime/workflowReducer';
-import { AGENT_CONNECTIONS, APPROVAL_AGENT_KEY, HUMAN_RESPONSE_TEAMS, VISUAL_AGENTS } from './agentCatalog';
+import { AGENT_CONNECTIONS, APPROVAL_AGENT_KEY, VISUAL_AGENTS } from './agentCatalog';
 import {
   STATUS_VISUALS,
   agentVisual,
@@ -66,19 +66,27 @@ function freshIdleIncident(): IncidentWorkflowState {
 }
 
 describe('command3d catalog integrity', () => {
-  it('declares exactly the five required visual agents with unique, real backend keys', () => {
-    expect(VISUAL_AGENTS).toHaveLength(5);
+  it('declares the current disaster graph nodes with unique backend keys', () => {
+    expect(VISUAL_AGENTS).toHaveLength(CURRENT_AGENT_ORDER.length);
     const keys = VISUAL_AGENTS.map((a) => a.key);
     expect(new Set(keys).size).toBe(keys.length); // unique
     for (const key of keys) {
-      expect(AGENT_ORDER).toContain(key); // every key is a real LangGraph node
+      expect(CURRENT_AGENT_ORDER).toContain(key); // every key is a real current graph node
     }
   });
 
-  it('maps to the five headline agents from the specification', () => {
+  it('maps to the current disaster agents and operational stages', () => {
     const titles = VISUAL_AGENTS.map((a) => a.title).sort();
     expect(titles).toEqual(
-      ['Incident Intelligence', 'Medical Response', 'Resource Allocation', 'Response Planning', 'Safety / Hazard'].sort(),
+      [
+        'Communication Agent', 'Disaster Analysis Agent', 'Geo Vulnerability Agent',
+        'Hospital Agent', 'Human Approval Gate', 'Hydrology / Environment Agent',
+        'Infrastructure Agent', 'Medical Triage Agent', 'Monitoring Agent',
+        'Recovery Agent', 'Rescue Priority Agent', 'Resource Coordination Agent',
+        'Response Planner Agent', 'Risk Prediction Agent', 'Routing Agent',
+        'Search & Rescue Agent', 'Security / Public Safety Agent', 'Shelter Agent',
+        'Situation State', 'Supervisor / Incident Commander', 'Weather Agent',
+      ].sort(),
     );
   });
 
@@ -92,7 +100,7 @@ describe('command3d catalog integrity', () => {
   });
 
   it('binds the approval gate to a real catalog agent', () => {
-    expect(APPROVAL_AGENT_KEY).toBe('synthesizer');
+    expect(APPROVAL_AGENT_KEY).toBe('approval_gate');
     expect(VISUAL_AGENTS.map((a) => a.key)).toContain(APPROVAL_AGENT_KEY);
   });
 
@@ -157,7 +165,8 @@ describe('deriveAgentDisplayStatus — the six visual states', () => {
 
   it('WAITING_APPROVAL overrides the planner while approval is pending', () => {
     const inc = build([
-      ev('agent_completed', { agent: 'synthesizer' }),
+      ev('agent_completed', { agent: 'response_planner' }),
+      ev('agent_completed', { agent: 'approval_gate' }),
       ev('approval_required', { plan_id: 'P1' }),
     ]);
     expect(deriveAgentDisplayStatus(inc, APPROVAL_AGENT_KEY)).toBe('WAITING_APPROVAL');
@@ -173,7 +182,8 @@ describe('deriveAgentDisplayStatus — the six visual states', () => {
 
   it('clears WAITING_APPROVAL once the decision is made', () => {
     const inc = build([
-      ev('agent_completed', { agent: 'synthesizer' }),
+      ev('agent_completed', { agent: 'response_planner' }),
+      ev('agent_completed', { agent: 'approval_gate' }),
       ev('approval_required', { plan_id: 'P1' }),
       ev('approval_approved', { plan_id: 'P1', approved_by: 'commander' }),
     ]);
@@ -194,11 +204,12 @@ describe('agentVisual', () => {
 });
 
 describe('humanTeamVisual', () => {
-  it('declares separate human-response nodes for every operational department', () => {
-    expect(HUMAN_RESPONSE_TEAMS.map((team) => team.department)).toEqual([
-      'MEDICAL', 'SECURITY', 'TRANSPORT', 'COMMUNICATION', 'FIRE', 'FACILITIES',
-    ]);
-    expect(new Set(HUMAN_RESPONSE_TEAMS.map((team) => team.key)).size).toBe(HUMAN_RESPONSE_TEAMS.length);
+  it('keeps legacy campus-team content out of the current 3D catalog', () => {
+    const text = VISUAL_AGENTS.map((agent) => `${agent.title} ${agent.subtitle}`).join(' ').toLowerCase();
+    expect(text).not.toContain('vignan');
+    expect(text).not.toContain('campus');
+    expect(text).not.toContain('complaint');
+    expect(text).not.toContain('student');
   });
 
   it('keeps backend assignment states semantically distinct', () => {

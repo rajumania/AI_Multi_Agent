@@ -1,0 +1,7 @@
+2026/08/29-06:08:38.183 8b94 Reusing MANIFEST C:\Users\rajub\Downloads\genai\AITAM\.phase11_6_chrome2\Default\IndexedDB\http_127.0.0.1_5173.indexeddb.leveldb/MANIFEST-000001
+2026/08/29-06:08:38.184 8b94 Recovering log #3
+2026/08/29-06:08:38.186 8b94 Reusing old log C:\Users\rajub\Downloads\genai\AITAM\.phase11_6_chrome2\Default\IndexedDB\http_127.0.0.1_5173.indexeddb.leveldb/000003.log 
+2026/08/29-06:08:40.345 8b94 Level-0 table #5: started
+2026/08/29-06:08:40.350 8b94 Level-0 table #5: 23030 bytes OK
+2026/08/29-06:08:40.356 8b94 Delete type=0 #3
+2026/08/29-06:08:40.357 8b94 Manual compaction at level-0 from (begin) .. (end); will stop at (end)

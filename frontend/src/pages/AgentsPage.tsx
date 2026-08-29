@@ -41,7 +41,7 @@ export const AgentsPage: React.FC = () => {
       icon: MessageSquare,
       color: '#f59e0b',
       role: 'Multi-Channel Alert Dissemination',
-      desc: 'Generates calibrated broadcast alerts for Campus SMS, Mobile App Push, and Campus PA Audio & Digital Signage.',
+      desc: 'Generates calibrated broadcast alerts for SMS, Mobile App Push, and public-address audio & digital signage.',
       safeguard: 'All high-priority broadcasts require human commander authorization before transmission.'
     },
   ];

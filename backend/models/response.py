@@ -36,6 +36,6 @@ class ResponsePlanRead(ResponsePlanBase):
 
 
 class ApprovalDecisionPayload(BaseModel):
-    decision: str = Field(..., description="'approve' or 'reject'")
-    operator_name: str = Field(default="Campus Safety Commander", description="Name/Role of authorizing person")
-    notes: Optional[str] = Field(default=None, description="Optional justification notes")
+    decision: str = Field(..., min_length=6, max_length=10, description="'approve' or 'reject'")
+    operator_name: str = Field(default="Campus Safety Commander", min_length=1, max_length=100, description="Name/Role of authorizing person")
+    notes: Optional[str] = Field(default=None, max_length=2000, description="Optional justification notes")

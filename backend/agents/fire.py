@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional
 from backend.services.llm_service import llm_service
 
 
-FIRE_AGENT_SYSTEM_PROMPT = """You are the specialized Fire & Safety Operations Agent for CAMPUSFLOW AI.
+FIRE_AGENT_SYSTEM_PROMPT = """You are the specialized Fire & Safety Operations Agent for AITAM Disaster Response AI.
 Your duty is to assess fire, smoke, explosion, chemical/hazmat, and thermal hazards, recommend suppression/containment actions, and advise on evacuation of affected structures.
 
 CRITICAL SAFETY RULES:

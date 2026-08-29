@@ -98,7 +98,7 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({
       {/* Title & Actions Bar */}
       <div className="dashboard-title-row">
         <div>
-          <h2>Campus Emergency Incidents & Command Queue</h2>
+          <h2>Disaster Events & Response Queue</h2>
           <p>Real-time intake stream, operational assessment, commander authorization, and responder telemetry.</p>
         </div>
 
@@ -168,11 +168,11 @@ export const IncidentsPage: React.FC<IncidentsPageProps> = ({
         <div className="panel-card" style={{ padding: '3.5rem 1.5rem', textAlign: 'center' }}>
           <AlertTriangle size={36} color="#94a3b8" style={{ margin: '0 auto 0.75rem' }} />
           <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-            No Emergency Incidents Found
+            No Disaster Events Found
           </h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
             {incidents.length === 0
-              ? 'No campus emergency reports have been lodged yet. The intake pipeline is standing by.'
+              ? 'No disaster reports have been lodged yet. The community intake pipeline is standing by.'
               : 'No incidents match the selected filter criteria.'}
           </p>
           <button className="btn btn-danger" onClick={onOpenReportModal} style={{ backgroundColor: 'var(--danger-600)', color: '#ffffff' }}>

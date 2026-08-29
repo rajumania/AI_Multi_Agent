@@ -39,7 +39,7 @@ describe('Department Management authorization and form rules', () => {
   });
 
   it('uses every backend-supported department and role', () => {
-    expect(DEPARTMENTS).toEqual(['SECURITY', 'MEDICAL', 'TRANSPORT', 'COMMUNICATION', 'FIRE', 'FACILITIES']);
+    expect(DEPARTMENTS).toEqual(['MEDICAL', 'SEARCH_AND_RESCUE', 'FIRE', 'SECURITY', 'TRANSPORT', 'COMMUNICATION', 'FACILITIES', 'SHELTER']);
     expect(DEPARTMENT_ACCOUNT_ROLES.map((item) => item.value)).toEqual([ROLE_DEPARTMENT, ROLE_DEPARTMENT_HEAD]);
   });
 
@@ -139,6 +139,6 @@ describe('Department registration API client', () => {
       department: 'MEDICAL',
       full_name: validValues.fullName,
       role: ROLE_DEPARTMENT_HEAD,
-    })).rejects.toThrow('operator session is no longer valid');
+    })).rejects.toThrow('command session is no longer valid');
   });
 });

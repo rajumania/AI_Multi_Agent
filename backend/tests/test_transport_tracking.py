@@ -24,14 +24,14 @@ def _operator(client):
 
 
 def _transport(client):
-    return _login(client, "/api/v1/auth/department/login", {"email": "transport@vignan.ac.in", "password": "password123", "department": "TRANSPORT"})
+    return _login(client, "/api/v1/auth/department/login", {"email": "transport@aitam.local", "password": "password123", "department": "TRANSPORT"})
 
 
 def _citizen(client):
-    return _login(client, "/api/v1/auth/user/login", {"email": "student@vignan.ac.in", "phone": "9000000000"})
+    return _login(client, "/api/v1/auth/user/login", {"email": "community@aitam.local", "phone": "9000000000"})
 
 
-def _incident(db_session, *, lat=16.2345, lng=80.5505):
+def _incident(db_session, *, lat=18.56577, lng=84.19657):
     row = IncidentDB(
         incident_id=f"INC-TRACK-{uuid4().hex[:8].upper()}",
         description="Temporary transport tracking test incident",
@@ -108,8 +108,8 @@ def test_assigned_transport_writes_durable_gps_and_creates_coordinate_route(clie
             "vehicle_id": "VEH-001",
             "assignment_id": assignment.id,
             "incident_id": incident.incident_id,
-            "latitude": 16.2330,
-            "longitude": 80.5510,
+            "latitude": 18.56497,
+            "longitude": 84.19567,
             "accuracy": 4.0,
             "speed": 5.0,
             "heading": 90.0,
@@ -118,10 +118,10 @@ def test_assigned_transport_writes_durable_gps_and_creates_coordinate_route(clie
     assert response.status_code == 200, response.text
     assert response.json()["route_version"] == 1
     telemetry = db_session.query(TransportTelemetryDB).filter_by(assignment_id=assignment.id).one()
-    assert (telemetry.latitude, telemetry.longitude) == (16.2330, 80.5510)
+    assert (telemetry.latitude, telemetry.longitude) == (18.56497, 84.19567)
     route = db_session.query(RouteDB).filter_by(assignment_id=assignment.id, status="active").one()
     route_data = json.loads(route.path)
-    assert route_data["coordinates"][0] == [16.233, 80.551] or tuple(route_data["coordinates"][0]) == (16.233, 80.551)
+    assert route_data["coordinates"][0] == [18.56497, 84.19567] or tuple(route_data["coordinates"][0]) == (18.56497, 84.19567)
     snapshot = client.get(f"/api/v1/transport/assignments/{assignment.id}/tracking", headers=_auth(token))
     assert snapshot.status_code == 200
     assert snapshot.json()["gps_source"] == "REAL"
@@ -136,8 +136,8 @@ def test_assigned_transport_writes_durable_gps_and_creates_coordinate_route(clie
             "vehicle_id": "VEH-001",
             "assignment_id": assignment.id,
             "incident_id": incident.incident_id,
-            "latitude": 16.2332,
-            "longitude": 80.5512,
+            "latitude": 18.5651,
+            "longitude": 84.1958,
             "accuracy": 4.0,
             "speed": 5.0,
             "heading": 90.0,
@@ -146,7 +146,7 @@ def test_assigned_transport_writes_durable_gps_and_creates_coordinate_route(clie
     assert moved.status_code == 200, moved.text
     db_session.expire_all()
     refreshed_route = db_session.query(RouteDB).filter_by(assignment_id=assignment.id, status="active").one()
-    assert json.loads(refreshed_route.origin)["latitude"] == 16.2332
+    assert json.loads(refreshed_route.origin)["latitude"] == 18.5651
     assert refreshed_route.route_version == 1
     assert db_session.query(RouteReplanDB).filter_by(assignment_id=assignment.id).count() == 0
 
@@ -163,7 +163,7 @@ def test_transport_resource_and_websocket_visibility_are_scoped(client, db_sessi
     )
     assert unauthorized_resource.status_code == 403
 
-    unauthorized_department = _login(client, "/api/v1/auth/department/login", {"email": "medical@vignan.ac.in", "password": "password123", "department": "MEDICAL"})
+    unauthorized_department = _login(client, "/api/v1/auth/department/login", {"email": "medical@aitam.local", "password": "password123", "department": "MEDICAL"})
     blocked = client.get(f"/api/v1/transport/assignments/{assignment.id}/tracking", headers=_auth(unauthorized_department))
     assert blocked.status_code == 403
 
@@ -185,7 +185,7 @@ def test_blocked_campus_segment_creates_route_replan(client, db_session, monkeyp
     assert client.post(
         "/api/v1/telemetry/location",
         headers=telemetry_headers,
-        json={"vehicle_id": "VEH-001", "assignment_id": assignment.id, "incident_id": incident.incident_id, "latitude": 16.2330, "longitude": 80.5510},
+        json={"vehicle_id": "VEH-001", "assignment_id": assignment.id, "incident_id": incident.incident_id, "latitude": 18.56497, "longitude": 84.19567},
     ).status_code == 200
     response = client.post(
         "/api/v1/road-conditions",

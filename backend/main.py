@@ -8,7 +8,7 @@ from sqlalchemy import text
 from backend.config import settings
 from backend.database.database import engine, Base, get_db, SessionLocal
 from backend.database.migrate import ensure_schema
-from backend.database.seed import seed_resources, seed_users
+from backend.database.seed import seed_resources, seed_users, seed_disaster_domain, seed_organization
 from backend.database.models import CampusResourceDB
 from backend.api.incidents import router as incidents_router
 from backend.api.resources import router as resources_router
@@ -24,11 +24,21 @@ from backend.api.telemetry import router as telemetry_router
 from backend.api.voice import router as voice_router
 from backend.api.system import router as system_router
 from backend.api.assignments import router as assignments_router
-from backend.api.notifications import router as notifications_router
+from backend.api.notifications import router as notifications_router, alerts_router
+from backend.api.disaster_domain import router as disaster_domain_router
 from backend.api.chat import router as chat_router
 from backend.api.campus_locations import router as campus_locations_router
 from backend.api.transport import router as transport_router
 from backend.api.road_conditions import router as road_conditions_router
+from backend.api.risk import router as risk_router, demo_router
+from backend.api.weather import router as weather_router
+from backend.api.phase3 import router as phase3_router
+from backend.api.map import router as map_router
+from backend.api.earthquakes import router as earthquakes_router
+from backend.api.organization import router as organization_router
+from backend.api.intelligence import router as intelligence_router
+from backend.api.location import router as location_router
+from backend.api.evidence import router as evidence_router
 from backend.services.notification_service import register_lifecycle_notifications
 
 
@@ -42,7 +52,9 @@ async def lifespan(app: FastAPI):
     # Seed initial mock campus resources
     db = SessionLocal()
     try:
+        seed_organization(db)
         seed_resources(db)
+        seed_disaster_domain(db)
         seed_users(db)
     finally:
         db.close()
@@ -51,29 +63,29 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="AI Multi-Agent Campus Emergency Response & Resource Coordination System",
+    description="Disaster Prediction & Community Response System — Aditya Institute of Technology and Management",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# Configure CORS
-origins = [
-    settings.FRONTEND_URL,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5175",
-    "http://127.0.0.1:5175",
-    "http://localhost:5176",
-    "http://127.0.0.1:5176",
-    "http://localhost:3000",
-]
+# Configure CORS from the explicitly configured frontend origin. Development
+# keeps the existing local Vite ports; production never inherits them.
+origins = [origin.strip() for origin in settings.FRONTEND_URL.split(",") if origin.strip()]
+if settings.ENVIRONMENT.strip().lower() not in {"production", "prod"}:
+    origins.extend([
+        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:5175", "http://127.0.0.1:5175",
+        "http://localhost:5176", "http://127.0.0.1:5176",
+        "http://localhost:3000",
+    ])
+origins = list(dict.fromkeys(origins))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Authorization", "Content-Type", "X-Auth-Token", "X-Client-Operation-Id", "X-GPS-Device-Token"],
 )
 
 # Include API Routers
@@ -92,10 +104,22 @@ app.include_router(voice_router)
 app.include_router(system_router)
 app.include_router(assignments_router)
 app.include_router(notifications_router)
+app.include_router(alerts_router)
+app.include_router(disaster_domain_router)
 app.include_router(chat_router)
 app.include_router(campus_locations_router)
 app.include_router(transport_router)
 app.include_router(road_conditions_router)
+app.include_router(risk_router)
+app.include_router(weather_router)
+app.include_router(demo_router)
+app.include_router(phase3_router)
+app.include_router(map_router)
+app.include_router(earthquakes_router)
+app.include_router(organization_router)
+app.include_router(intelligence_router)
+app.include_router(location_router)
+app.include_router(evidence_router)
 register_lifecycle_notifications()
 
 
@@ -114,8 +138,10 @@ def health_check(db: Session = Depends(get_db)):
         db.execute(text("SELECT 1"))
         resource_count = db.query(CampusResourceDB).count()
         db_status = "connected"
-    except Exception as e:
-        db_status = f"error: {str(e)}"
+    except Exception:
+        # Health responses are public operational signals; do not return SQL,
+        # filesystem, or provider exception text to clients.
+        db_status = "error"
         resource_count = 0
 
     return {

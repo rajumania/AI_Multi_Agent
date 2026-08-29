@@ -3,16 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   Shield,
   Lock,
-  User,
   Mail,
-  Phone,
   Building,
   Sparkles,
   AlertCircle,
-  UserPlus,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { TeamGenAIShowcase } from '../components/TeamGenAIShowcase';
 import {
   AuthUser,
   DEPARTMENTS,
@@ -21,7 +17,7 @@ import {
   homePathFor,
 } from '../auth/roles';
 
-type Mode = 'operator' | 'member' | 'department';
+type Mode = 'admin' | 'community' | 'department';
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -87,25 +83,19 @@ const focusOff = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) =>
  */
 export const LoginPage: React.FC = () => {
   const {
-    loginOperator,
     loginCitizen,
-    registerCitizen,
     loginDepartment,
+    loginAdmin,
     sessionExpired,
     clearSessionExpired,
   } = useAuth();
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState<Mode>('operator');
-  const [memberMode, setMemberMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<Mode>('community');
 
-  // operator
+  // Community display role preserves the existing operator authentication flow.
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  // member (citizen)
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [fullName, setFullName] = useState('');
   // department
   const [deptEmail, setDeptEmail] = useState('');
   const [deptPassword, setDeptPassword] = useState('');
@@ -128,21 +118,14 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
     try {
       let user: AuthUser;
-      if (mode === 'operator') {
-        if (!username || !password) throw new Error('Enter your username and password.');
-        user = await loginOperator(username.trim(), password);
-      } else if (mode === 'member') {
-        if (!email || !phone) {
-          throw new Error(
-            memberMode === 'register'
-              ? 'Enter your email and phone to register.'
-              : 'Enter your registered email and phone.',
-          );
-        }
-        user =
-          memberMode === 'register'
-            ? await registerCitizen(email.trim(), phone.trim(), fullName.trim() || undefined)
-            : await loginCitizen(email.trim(), phone.trim());
+      if (mode === 'admin') {
+        if (!username || !password) throw new Error('Enter your administrator username and password.');
+        user = await loginAdmin(username.trim(), password);
+      } else if (mode === 'community') {
+        if (!username || !password) throw new Error('Enter your community email and phone.');
+        // The existing community identity flow uses email + phone and always
+        // returns the constrained `user` role; it cannot grant command access.
+        user = await loginCitizen(username.trim(), password.trim());
       } else {
         if (!deptEmail || !deptPassword) {
           throw new Error('Enter your department email and password.');
@@ -158,19 +141,17 @@ export const LoginPage: React.FC = () => {
   };
 
   const tabs: { key: Mode; label: string }[] = [
-    { key: 'operator', label: 'Operator' },
-    { key: 'member', label: 'Campus Member' },
+    { key: 'admin', label: 'Admin' },
+    { key: 'community', label: 'Community' },
     { key: 'department', label: 'Department' },
   ];
 
   const submitLabel =
-    mode === 'operator'
+    mode === 'admin'
       ? 'SIGN IN TO COMMAND CENTER'
-      : mode === 'department'
-        ? 'SIGN IN TO DEPARTMENT PORTAL'
-        : memberMode === 'register'
-          ? 'REGISTER & ENTER PORTAL'
-          : 'SIGN IN TO MY PORTAL';
+      : mode === 'community'
+      ? 'SIGN IN TO COMMUNITY DASHBOARD'
+      : 'SIGN IN TO DEPARTMENT PORTAL';
 
   return (
     <div
@@ -214,8 +195,6 @@ export const LoginPage: React.FC = () => {
         }}
       />
 
-      <TeamGenAIShowcase />
-
       <div
         className="login-card"
         style={{
@@ -247,10 +226,10 @@ export const LoginPage: React.FC = () => {
             <Shield size={32} color="#ffffff" />
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, letterSpacing: '-0.025em' }}>
-            CAMPUSFLOW AI
+            AITAM DISASTER RESPONSE AI
           </h2>
           <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.35rem' }}>
-            Vignan University Emergency Response
+            Disaster Prediction & Community Response System
           </p>
         </div>
 
@@ -332,12 +311,13 @@ export const LoginPage: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-          {mode === 'operator' && (
+          {mode === 'admin' && (
             <>
-              <Field label="Username" icon={<User size={16} />}>
+              <Field label="Administrator username" icon={<Shield size={16} />}>
                 <input
                   type="text"
-                  placeholder="Enter username"
+                  autoComplete="username"
+                  placeholder="admin"
                   style={inputStyle}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -345,10 +325,11 @@ export const LoginPage: React.FC = () => {
                   onBlur={focusOff}
                 />
               </Field>
-              <Field label="Password" icon={<Lock size={16} />}>
+              <Field label="Administrator password" icon={<Lock size={16} />}>
                 <input
                   type="password"
-                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  placeholder="Enter administrator password"
                   style={inputStyle}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -359,72 +340,30 @@ export const LoginPage: React.FC = () => {
             </>
           )}
 
-          {mode === 'member' && (
+          {mode === 'community' && (
             <>
-              {memberMode === 'register' && (
-                <Field label="Full Name (optional)" icon={<User size={16} />}>
-                  <input
-                    type="text"
-                    placeholder="e.g. Asha Kumari"
-                    style={inputStyle}
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    onFocus={focusOn}
-                    onBlur={focusOff}
-                  />
-                </Field>
-              )}
-              <Field label="Email" icon={<Mail size={16} />}>
+              <Field label="Community email" icon={<Mail size={16} />}>
                 <input
-                  type="email"
-                  placeholder="you@vignan.ac.in"
+                  type="text"
+                  placeholder="community@aitam.local"
                   style={inputStyle}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   onFocus={focusOn}
                   onBlur={focusOff}
                 />
               </Field>
-              <Field label="Phone" icon={<Phone size={16} />}>
+              <Field label="Phone / access code" icon={<Lock size={16} />}>
                 <input
-                  type="tel"
-                  placeholder="10-digit mobile number"
+                  type="password"
+                  placeholder="10-digit phone"
                   style={inputStyle}
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   onFocus={focusOn}
                   onBlur={focusOff}
                 />
               </Field>
-              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '-0.35rem' }}>
-                {memberMode === 'login' ? (
-                  <>
-                    New here?{' '}
-                    <span
-                      onClick={() => {
-                        setMemberMode('register');
-                        setError(null);
-                      }}
-                      style={{ color: '#38bdf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      Register with email + phone
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    Already registered?{' '}
-                    <span
-                      onClick={() => {
-                        setMemberMode('login');
-                        setError(null);
-                      }}
-                      style={{ color: '#38bdf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      Sign in instead
-                    </span>
-                  </>
-                )}
-              </div>
             </>
           )}
 
@@ -448,7 +387,7 @@ export const LoginPage: React.FC = () => {
               <Field label="Department Email" icon={<Mail size={16} />}>
                 <input
                   type="email"
-                  placeholder="security@vignan.ac.in"
+                  placeholder="security@aitam.local"
                   style={inputStyle}
                   value={deptEmail}
                   onChange={(e) => setDeptEmail(e.target.value)}
@@ -498,28 +437,14 @@ export const LoginPage: React.FC = () => {
               <span>Authenticating…</span>
             ) : (
               <>
-                {mode === 'member' && memberMode === 'register' ? <UserPlus size={16} /> : <Sparkles size={16} />}
+                <Sparkles size={16} />
                 <span>{submitLabel}</span>
               </>
             )}
           </button>
         </form>
 
-        {/* Operator account creation link (existing signup flow) */}
-        {mode === 'operator' && (
-          <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.8rem', color: '#94a3b8' }}>
-            Need a staff account?{' '}
-            <span
-              onClick={() => navigate('/signup')}
-              style={{ color: '#38bdf8', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              Create an Account
-            </span>
-          </div>
-        )}
-
-        {/* Local demo credentials */}
-        <div
+        {import.meta.env.DEV && <div
           style={{
             marginTop: '1.5rem',
             paddingTop: '1rem',
@@ -530,16 +455,16 @@ export const LoginPage: React.FC = () => {
             lineHeight: 1.7,
           }}
         >
-          {mode === 'operator' && (
-            <>💡 Operator: <strong>admin</strong> / <strong>password123</strong></>
+          {mode === 'admin' && (
+            <>Admin: <strong>admin</strong> / <strong>AITAM@Admin123</strong></>
           )}
-          {mode === 'member' && (
-            <>💡 Campus member: <strong>student@vignan.ac.in</strong> / <strong>9000000000</strong></>
+          {mode === 'community' && (
+            <>💡 Community: <strong>community@aitam.local</strong> / <strong>9000000000</strong></>
           )}
           {mode === 'department' && (
-            <>💡 Department: <strong>{department.toLowerCase()}@vignan.ac.in</strong> / <strong>password123</strong></>
+            <>💡 Department: <strong>{department.toLowerCase()}@aitam.local</strong> / <strong>password123</strong></>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );

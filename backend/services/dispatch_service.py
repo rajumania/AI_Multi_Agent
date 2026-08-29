@@ -17,10 +17,6 @@ from backend.services.event_engine import event_engine
 from backend.services.assignment_service import create_required_assignments
 
 
-from backend.services.adapters.sms_adapter import sms_adapter
-from backend.services.adapters.push_adapter import push_adapter
-from backend.services.adapters.email_adapter import email_adapter
-from backend.services.adapters.voice_adapter import voice_adapter
 from backend.services.adapters.dispatch_adapter import dispatch_adapter
 from backend.services.responder_directory import responder_directory
 
@@ -28,9 +24,9 @@ from backend.services.responder_directory import responder_directory
 class DispatchService:
     """
     Step 7 Execution & Dispatch Service:
-    - Executes approved action plans through real service adapters (SMS, Push, Email, Voice, CAD Dispatch).
+    - Executes approved action plans against the existing response/resource layer.
     - Updates resource availability state in SQLite database.
-    - Emits real-time WebSocket events for all provider operations.
+    - Emits real-time WebSocket events for the authenticated in-app channel.
     - Manages complete incident resolution and automatic resource pool release.
     """
 
@@ -59,6 +55,18 @@ class DispatchService:
 
         now = datetime.now(timezone.utc)
         allocated_ids: List[str] = json.loads(plan.allocated_resources) if isinstance(plan.allocated_resources, str) else plan.allocated_resources
+
+        event_engine.publish_event(
+            event_name="response_execution_started",
+            incident_id=incident.incident_id,
+            payload={
+                "event_name": "response_execution_started",
+                "event": "RESPONSE_EXECUTION_STARTED",
+                "plan_id": plan_id,
+                "status": "executing",
+                "description": "Approved response plan entered execution.",
+            },
+        )
 
         # 3. Dispatch Physical Campus Resources in SQLite
         dispatched_resources: List[str] = []
@@ -94,68 +102,21 @@ class DispatchService:
             }
         )
 
-        # 5. Multi-Channel External Operations via Adapters
-        broadcasts: List[BroadcastNotification] = []
-
-        # A. SMS remains an optional external integration.
-        sms_body = f"CAMPUSFLOW ALERT: {incident.incident_type.upper()} reported near {incident.location}. Dispatched units: {', '.join(dispatched_resources) if dispatched_resources else 'Patrol'}. Keep routes clear."
-        broadcasts.append(BroadcastNotification(
-            channel="SMS (Optional)",
-            recipient_group="Optional provider not configured",
-            headline=f"ALERT: {incident.incident_type.upper()} at {incident.location}",
-            message=sms_body,
+        # 5. The approved operational boundary is the existing in-app
+        # notification system. No SMS, email, telephony, or push delivery is
+        # attempted or represented as part of this workflow.
+        broadcasts: List[BroadcastNotification] = [BroadcastNotification(
+            channel="Authenticated WebSocket / In-App",
+            recipient_group="Evidence-targeted departments and Admin",
+            headline=f"Active response: {incident.location}",
+            message="The approved response is available through the authenticated in-app notification stream.",
             timestamp=now,
-            status="OPTIONAL / NOT CONFIGURED"
-        ))
-
-        # B. Push Notification Dispatch
-        push_tokens = [settings.TEST_DEVICE_TOKEN] if settings.TEST_DEVICE_TOKEN else []
-        push_res = push_adapter.send_push(
-            title=f"Emergency Alert: {incident.incident_type.upper()}",
-            body=f"Active emergency near {incident.location}. Emergency units in transit.",
-            target_tokens=push_tokens
-        )
-        broadcasts.append(BroadcastNotification(
-            channel=f"Push ({push_res.provider})",
-            recipient_group=f"Registered Mobile Devices ({push_res.recipient_count} devices)",
-            headline=f"Active Safety Zone: {incident.location}",
-            message=f"Please follow steward guidance. Active emergency response deployed.",
-            timestamp=now,
-            status=f"{push_res.status.value.upper()} - {push_res.message_id or push_res.error or 'N/A'}"
-        ))
-
-        # C. Email Dispatch
-        email_recipients = [settings.TEST_EMAIL_ADDRESS] if settings.TEST_EMAIL_ADDRESS else []
-        email_res = email_adapter.send_email(
-            recipients=email_recipients,
-            subject=f"[EMERGENCY ALERT] {incident.incident_type.upper()} at {incident.location}",
-            body_text=f"CampusFlow Emergency Response System\nCampusFlow Incident ID: {incident.incident_id}\nIncident: {incident.incident_type}\nSeverity: {incident.severity}\nLocation: {incident.location}\nTimestamp: {now.isoformat()}\nRecommended response: Follow the approved response plan and campus commander directions.\nAssigned agents/responders: {', '.join(dispatched_resources) or 'Response team'}\nEvacuation instruction: Use the designated safe exit and keep emergency routes clear.\nSummary: {incident.summary}"
-        )
-        broadcasts.append(BroadcastNotification(
-            channel=f"Email ({email_res.provider})",
-            recipient_group=f"Campus Operations ({email_res.recipient_count} recipients)",
-            headline=f"Incident Briefing - {incident.location}",
-            message="Email adapter evaluated; no delivery is claimed unless the configured SMTP provider confirms it.",
-            timestamp=now,
-            status=f"{email_res.status.value.upper()} - {email_res.message_id or email_res.error or 'N/A'}"
-        ))
-
-        # D. AI Voice Audio Announcement
-        voice_audio = voice_adapter.generate_voice_audio(
-            f"Attention all personnel. An emergency involving {incident.incident_type} has been reported at {incident.location}. Please follow safety instructions."
-        )
-        broadcasts.append(BroadcastNotification(
-            channel="AI Voice Announcement",
-            recipient_group="Campus Broadcasters",
-            headline="Voice Advisory Ready",
-            message=f"Generated AI audio announcement: '{voice_audio.get('text')}'",
-            timestamp=now,
-            status=f"READY ({voice_audio.get('audio_id')})"
-        ))
+            status="CREATED",
+        )]
 
         # 6. Transition Incident status
         incident.status = "in_progress"
-        incident.current_step = f"Emergency response initiated. Units dispatched: {', '.join(dispatched_resources) if dispatched_resources else 'Patrol'}. In-app alert active; optional provider channels evaluated truthfully."
+        incident.current_step = f"Emergency response initiated. Units dispatched: {', '.join(dispatched_resources) if dispatched_resources else 'No physical resource allocation'}. In-app alert active."
         incident.next_action = "Response team en-route. Monitoring telemetry and route geometry."
         db.commit()
 
@@ -169,7 +130,7 @@ class DispatchService:
             payload={
                 "event_name": "dispatch_started",
                 "plan_id": plan_id,
-                "description": f"Response in progress. {len(dispatched_resources)} campus resource(s) assigned.",
+                "description": f"Response in progress. {len(dispatched_resources)} response resource(s) assigned.",
                 "dispatched_resources": dispatched_resources,
                 "status": incident.status,
             },
@@ -192,6 +153,19 @@ class DispatchService:
             },
             db=None,
         )
+        event_engine.publish_event(
+            event_name="response_execution_completed",
+            incident_id=incident.incident_id,
+            payload={
+                "event_name": "response_execution_completed",
+                "event": "RESPONSE_EXECUTION_COMPLETED",
+                "plan_id": plan_id,
+                "status": "dispatched",
+                "dispatched_resources": dispatched_resources,
+                "description": "Approved response plan completed dispatch handoff.",
+            },
+            db=None,
+        )
         for resource_id in dispatched_resources:
             event_engine.publish_event(
                 event_name="resource_dispatched",
@@ -204,20 +178,15 @@ class DispatchService:
                 db=db,
             )
 
-        # Trigger background vehicle movement simulation
-        if dispatched_resources:
-            try:
-                loop = asyncio.get_running_loop()
-                if loop.is_running():
-                    loop.create_task(run_vehicle_simulation(incident.incident_id, plan.plan_id, dispatched_resources))
-            except RuntimeError:
-                pass
+        # Vehicle state changes are driven by authenticated assignment actions
+        # and real telemetry. Do not synthesize movement or WebSocket lifecycle
+        # events after dispatch.
 
 
         # 6. Audit Logging
         audit_service.log(
             action_type="automation_execution",
-            description=f"Response workflow initiated for plan {plan_id}. Dispatched {len(dispatched_resources)} unit(s). In-app alert displayed; optional provider results recorded.",
+            description=f"Response workflow initiated for plan {plan_id}. Dispatched {len(dispatched_resources)} unit(s). In-app alert displayed.",
             incident_id=incident.incident_id,
             plan_id=plan_id,
             actor="System",
@@ -233,8 +202,8 @@ class DispatchService:
             incident_id=incident.incident_id,
             payload={
                 "event_name": "in_app_alert_available",
-                "description": "In-app emergency alert is displayed. No external mobile provider delivery claimed.",
-                "channel": "IN-APP ALERT — LOCAL",
+                "description": "In-app emergency alert is available through the authenticated WebSocket and durable notification history.",
+                "channel": "AUTHENTICATED WEBSOCKET / IN-APP",
             },
             db=db,
         )
@@ -246,7 +215,7 @@ class DispatchService:
             dispatched_resources=dispatched_resources,
             broadcast_alerts=broadcasts,
             executed_at=now,
-            execution_notes=f"Dispatched {len(dispatched_resources)} units for {incident.location}. In-app alert and browser voice are available; optional external channel results are explicitly reported."
+            execution_notes=f"Dispatched {len(dispatched_resources)} units for {incident.location}. In-app WebSocket alert is available."
         )
 
     def resolve_incident(

@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional
 from backend.services.llm_service import llm_service
 
 
-SECURITY_AGENT_SYSTEM_PROMPT = """You are the specialized Security & Perimeter Operations Agent for CAMPUSFLOW AI.
+SECURITY_AGENT_SYSTEM_PROMPT = """You are the specialized Security & Perimeter Operations Agent for AITAM Disaster Response AI.
 Your duty is to assess physical security risks, hazardous-material perimeter control, crowd safety, evacuation routes, and security unit dispatch recommendations.
 
 CRITICAL SAFETY RULES:
@@ -83,9 +83,9 @@ class SecurityAgent:
             lockdown = False
         elif incident_type == "security":
             if unit_ids:
-                actions.append(f"Dispatch campus security patrol ({', '.join(unit_ids[:2])}) immediately to {location}.")
+                actions.append(f"Dispatch public-safety patrol ({', '.join(unit_ids[:2])}) immediately to {location}.")
             else:
-                actions.append(f"Dispatch campus security patrol immediately to {location}.")
+                actions.append(f"Dispatch public-safety patrol immediately to {location}.")
             actions.append("Monitor building CCTV feeds and isolate access points.")
             if is_high:
                 actions.append("Initiate temporary controlled access lockdown for adjacent zones.")

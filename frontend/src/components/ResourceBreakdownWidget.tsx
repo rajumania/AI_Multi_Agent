@@ -16,7 +16,7 @@ export const ResourceBreakdownWidget: React.FC = () => {
       <div className="panel-header">
         <div className="panel-title">
           <Layers size={18} color="#0284c7" />
-          <span>Campus Resources Summary</span>
+          <span>Response Resources Summary</span>
         </div>
         <span className="panel-tag">Seeded Registry</span>
       </div>

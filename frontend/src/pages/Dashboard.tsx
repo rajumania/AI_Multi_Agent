@@ -12,12 +12,13 @@ import {
 } from 'lucide-react';
 import { HealthResponse, Incident, LiveEvent, ResponsePlan } from '../types';
 import { MetricCard } from '../components/MetricCard';
-import { CampusMap } from '../components/CampusMap';
+import { DisasterRiskMap } from '../components/DisasterRiskMap';
 import { RecentActivityPlaceholder } from '../components/RecentActivityPlaceholder';
 import { ResourceBreakdownWidget } from '../components/ResourceBreakdownWidget';
 import { SimulationControls } from '../components/SimulationControls';
 import { OperatorLocation, RealOperationsControls } from '../components/RealOperationsControls';
 import { AudioCapabilityState, VoiceAlertState } from '../services/voiceAlertController';
+import { RiskPanel } from '../components/RiskPanel';
 
 
 interface DashboardProps {
@@ -49,6 +50,7 @@ interface DashboardProps {
   onGpsLocation?: (location: OperatorLocation | null) => void;
   onResolveIncident?: (incident: Incident) => void;
   onViewResponsePlan?: () => void;
+  riskRefreshKey?: number;
 }
 
 const timelineLabel = (eventName: string) => {
@@ -56,7 +58,7 @@ const timelineLabel = (eventName: string) => {
     incident_created: 'Incident reported',
     incident_reported_client: 'Incident reported',
     ai_analysis_completed: 'AI Incident Analysis completed',
-    resources_verified: 'Campus resources identified',
+    resources_verified: 'Emergency resources identified',
     response_plan_generated_client: 'Response plan generated',
     approval_granted_client: 'Response plan authorized',
     dispatch_started_client: 'Responder/resource assignment started',
@@ -66,7 +68,7 @@ const timelineLabel = (eventName: string) => {
     agent_completed: 'AI agent completed',
     response_plan_updated: 'Response plan preparation completed',
     response_plan_generated: 'Response plan generated',
-    resource_verified: 'Campus resources verified',
+    resource_verified: 'Emergency resources verified',
     approval_granted: 'Response plan authorized',
     dispatch_started: 'Response dispatch started',
     resource_dispatched: 'Responder/resource assigned',
@@ -74,7 +76,7 @@ const timelineLabel = (eventName: string) => {
     voice_alert_started: 'Voice emergency alert started',
     in_app_alert_available: 'In-app emergency alert displayed',
     in_app_alert_displayed: 'In-app emergency alert displayed',
-    voice_alert_muted: 'Voice alert muted by operator',
+    voice_alert_muted: 'Voice alert muted by command user',
     voice_alert_stopped: 'Voice alert stopped',
     incident_resolved: 'Incident resolved',
   };
@@ -110,6 +112,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onGpsLocation,
   onResolveIncident,
   onViewResponsePlan,
+  riskRefreshKey = 0,
 }) => {
   const resourceCount = health?.seeded_resources ?? 13;
   const activeIncidents = incidents.filter((i) => i.status !== 'resolved' && i.status !== 'closed');
@@ -155,15 +158,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="emergency-actions"><button className="btn btn-outline" onClick={onViewResponsePlan}>VIEW RESPONSE PLAN</button><button className="btn btn-outline" onClick={() => document.querySelector('.map-command-panel')?.scrollIntoView({ behavior: 'smooth' })}>VIEW MAP</button><button className="btn btn-danger" onClick={() => onResolveIncident?.(activeIncident)}>RESOLVE INCIDENT</button></div>
             </div>
           </section>
-          {demoPushVisible && <section className="demo-push-card"><div className="demo-push-label">IN-APP ALERT — LOCAL CHANNEL</div><h3>CAMPUS EMERGENCY ALERT</h3><strong>{activeIncident.incident_type.toUpperCase()} reported:</strong><p>{activeIncident.location}</p><p>Response teams activated.</p><small>Recipients: Security Team • Medical Team • Evacuation Team</small><em>No external mobile push delivery claimed.</em></section>}
+          {demoPushVisible && <section className="demo-push-card"><div className="demo-push-label">IN-APP ALERT — LOCAL CHANNEL</div><h3>AITAM EMERGENCY ALERT</h3><strong>{activeIncident.incident_type.toUpperCase()} reported:</strong><p>{activeIncident.location}</p><p>Response teams activated.</p><small>Recipients: Security Team • Medical Team • Evacuation Team</small><em>No external mobile push delivery claimed.</em></section>}
         </div>
       )}
       {workflowError && <div className="alert-banner error" role="alert">{workflowError}</div>}
 
       <div className="dashboard-title-row">
         <div>
-          <h2>Campus Operations Command Center</h2>
-          <p>Real-time emergency operations, Vignan University campus monitoring, and rapid response coordination.</p>
+          <h2>Disaster Response Command Center</h2>
+          <p>Real-time emergency operations, AITAM community monitoring, and rapid response coordination.</p>
         </div>
 
         <div className="quick-actions-group">
@@ -186,6 +189,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       </div>
+
+      <RiskPanel refreshKey={riskRefreshKey} />
 
       {/* Top Level Metric Cards */}
       <div className="metrics-grid">
@@ -216,7 +221,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <MetricCard
           label="Available Resources"
           value={resourceCount}
-          subtext={`${resourceCount} verified campus emergency assets`}
+          subtext={`${resourceCount} verified emergency resources`}
           icon={Layers}
           variant="teal"
         />
@@ -286,7 +291,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Main 2-Column Section: Map & Activity Feed */}
       <div className="dashboard-columns">
-        <div className="map-command-panel"><CampusMap incidents={incidents} onSelectIncident={onNavigateToIncidents} activeIncidentId={activeIncident?.incident_id} operatorLocation={operatorLocation} /></div>
+        <div className="map-command-panel"><DisasterRiskMap incidents={incidents} onSelectIncident={onSelectIncident} activeIncidentId={activeIncident?.incident_id} liveEvents={timeline} operatorLocation={operatorLocation} /></div>
         <div className="timeline-column">
           <section className="panel-card live-timeline-card"><div className="panel-header"><div className="panel-title">LIVE RESPONSE TIMELINE</div><span className="panel-tag">SERVER / CLIENT EVENTS</span></div><div className="timeline-list">{timeline.filter((event) => !activeIncident || !event.incident_id || event.incident_id === activeIncident.incident_id).slice(0, 14).map((event, index) => <div className="timeline-item" key={`${event.timestamp}-${event.event_name}-${index}`}><div className="timeline-time">{event.time_display || new Date(event.timestamp).toLocaleTimeString()}</div><div className="timeline-content"><div className="timeline-title">{timelineLabel(event.event_name)}</div><div className="timeline-desc">{event.description || event.event_name.split('_').join(' ')}</div></div></div>)}{timeline.length === 0 && <div className="empty-timeline">Waiting for live incident events…</div>}</div></section>
           <RecentActivityPlaceholder />

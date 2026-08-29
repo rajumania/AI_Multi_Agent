@@ -1,4 +1,4 @@
-"""Idempotent, additive schema migration for CampusFlow AI.
+"""Idempotent, additive schema migration for AITAM Disaster Response AI.
 
 SQLite's ``CREATE TABLE`` (via ``Base.metadata.create_all``) creates any brand
 new tables, but it will NOT add new columns to tables that already exist from a
@@ -39,9 +39,19 @@ ADDITIVE_COLUMNS: Dict[str, List[Tuple[str, str, str]]] = {
         ("ai_provider_status", "VARCHAR(50)", "'PENDING'"),
         ("resolved_by", "VARCHAR(100)", None),
         ("resolution_message", "TEXT", None),
+        ("disaster_type", "VARCHAR(50)", None),
+        ("region_id", "VARCHAR(50)", None),
+        ("zone_id", "VARCHAR(50)", None),
+        ("community_id", "VARCHAR(50)", None),
+        ("image_url", "VARCHAR(500)", None),
+        ("detection_evidence", "TEXT", None),
+        ("client_operation_id", "VARCHAR(100)", None),
     ],
     "campus_resources": [
         ("department", "VARCHAR(50)", None),
+        ("current_assignment", "VARCHAR(100)", None),
+        ("emergency_beds", "INTEGER", None),
+        ("is_demo", "INTEGER", "0"),
     ],
     "users": [
         ("email", "VARCHAR(120)", None),
@@ -51,6 +61,67 @@ ADDITIVE_COLUMNS: Dict[str, List[Tuple[str, str, str]]] = {
     ],
     "chat_messages": [
         ("conversation_id", "VARCHAR(50)", None),
+    ],
+    "notifications": [
+        ("alert_type", "VARCHAR(50)", None),
+        ("audience", "VARCHAR(50)", None),
+        ("region_id", "VARCHAR(50)", None),
+        ("zone_id", "VARCHAR(50)", None),
+        ("expires_at", "TIMESTAMP", None),
+        ("is_demo", "INTEGER", "0"),
+        ("priority", "VARCHAR(20)", "'medium'"),
+        ("lifecycle_status", "VARCHAR(20)", "'CREATED'"),
+        ("delivered_at", "TIMESTAMP", None),
+        ("read_at", "TIMESTAMP", None),
+        ("event_key", "VARCHAR(160)", None),
+        ("details_json", "TEXT", None),
+    ],
+    "zones": [
+        ("elevation_m", "FLOAT", None),
+        ("slope_deg", "FLOAT", None),
+        ("vulnerability_score", "FLOAT", None),
+        ("historical_disaster_frequency", "FLOAT", None),
+        ("river_proximity_km", "FLOAT", None),
+        ("drainage_vulnerability", "FLOAT", None),
+        ("hazard_classification", "VARCHAR(80)", None),
+        ("coastal_vulnerability", "FLOAT", None),
+    ],
+    "weather_observations": [
+        ("location", "VARCHAR(120)", None),
+        ("latitude", "FLOAT", None),
+        ("longitude", "FLOAT", None),
+        ("received_at", "TIMESTAMP", None),
+        ("rainfall_intensity", "FLOAT", None),
+        ("humidity", "FLOAT", None),
+        ("wind_direction", "FLOAT", None),
+        ("pressure", "FLOAT", None),
+        ("precipitation_probability", "FLOAT", None),
+    ],
+    "environmental_observations": [
+        ("location", "VARCHAR(120)", None),
+        ("latitude", "FLOAT", None),
+        ("longitude", "FLOAT", None),
+        ("received_at", "TIMESTAMP", None),
+    ],
+    "risk_predictions": [
+        ("prediction_id", "VARCHAR(60)", None),
+        ("risk_score", "FLOAT", None),
+        ("confidence", "FLOAT", None),
+        ("features", "TEXT", None),
+        ("contributing_factors", "TEXT", None),
+        ("recommendations", "TEXT", None),
+        ("explanation", "TEXT", None),
+        ("data_status", "VARCHAR(30)", "'demo'"),
+        ("data_freshness_seconds", "FLOAT", None),
+        ("stale", "INTEGER", "0"),
+    ],
+    "agent_runs": [
+        ("run_id", "VARCHAR(60)", None),
+        ("event_id", "VARCHAR(60)", None),
+        ("required_agents", "TEXT", None),
+        ("agent_results", "TEXT", None),
+        ("agent_errors", "TEXT", None),
+        ("created_at", "TIMESTAMP", None),
     ],
     "routes": [
         ("assignment_id", "INTEGER", None),
@@ -101,6 +172,20 @@ def ensure_schema(engine: Engine) -> Dict[str, List[str]]:
         # --- Backfills (safe / idempotent) ---
         _backfill(conn)
 
+        # A nullable unique index allows legacy rows to remain untouched while
+        # making retries of an offline report resolve to the original record.
+        if "client_operation_id" in _existing_columns(conn, "incidents"):
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "ix_incidents_client_operation_id "
+                "ON incidents (client_operation_id)"
+            ))
+        if "event_key" in _existing_columns(conn, "notifications"):
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_notifications_event_key "
+                "ON notifications (event_key)"
+            ))
+
     return added
 
 
@@ -136,3 +221,16 @@ def _backfill(conn) -> None:
                 "WHERE status IS NULL OR status = ''"
             )
         )
+
+    # 4) Legacy observations did not track receipt time. Treat their
+    # observation timestamp as the best available receipt time so old rows
+    # remain readable and are honestly subject to freshness checks.
+    for table in ("weather_observations", "environmental_observations"):
+        columns = _existing_columns(conn, table)
+        if "received_at" in columns and "observed_at" in columns:
+            conn.execute(
+                text(
+                    f"UPDATE {table} SET received_at = observed_at "
+                    "WHERE received_at IS NULL"
+                )
+            )

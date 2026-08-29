@@ -36,7 +36,7 @@ def _department_token(client, email, department):
 def _citizen_token(client):
     r = client.post(
         "/api/v1/auth/user/login",
-        json={"email": "student@vignan.ac.in", "phone": "9000000000"},
+        json={"email": "community@aitam.local", "phone": "9000000000"},
     )
     assert r.status_code == 200, r.text
     return r.json()["token"]
@@ -93,14 +93,14 @@ class TestIncidentListScoping:
         fire_id = _create_incident(client, _FIRE, headers=_bearer(operator))
         accident_id = _create_incident(client, _ACCIDENT, headers=_bearer(operator))
 
-        # TRANSPORT is routed for accidents, NOT for fires.
-        transport = _department_token(client, "transport@vignan.ac.in", "TRANSPORT")
+        # Transport is routed for both the fire and accident operational plans.
+        transport = _department_token(client, "transport@aitam.local", "TRANSPORT")
         transport_visible = _list_ids(client, headers=_bearer(transport))
         assert accident_id in transport_visible
-        assert fire_id not in transport_visible
+        assert fire_id in transport_visible
 
         # FIRE is routed for fires, NOT for accidents.
-        fire_dept = _department_token(client, "fire@vignan.ac.in", "FIRE")
+        fire_dept = _department_token(client, "fire@aitam.local", "FIRE")
         fire_visible = _list_ids(client, headers=_bearer(fire_dept))
         assert fire_id in fire_visible
         assert accident_id not in fire_visible
@@ -144,9 +144,9 @@ class TestIncidentDetailScoping:
         fire_id = _create_incident(client, _FIRE, headers=_bearer(operator))
         accident_id = _create_incident(client, _ACCIDENT, headers=_bearer(operator))
 
-        transport = _department_token(client, "transport@vignan.ac.in", "TRANSPORT")
+        transport = _department_token(client, "transport@aitam.local", "TRANSPORT")
         assert client.get(f"/api/v1/incidents/{accident_id}", headers=_bearer(transport)).status_code == 200
-        assert client.get(f"/api/v1/incidents/{fire_id}", headers=_bearer(transport)).status_code == 404
+        assert client.get(f"/api/v1/incidents/{fire_id}", headers=_bearer(transport)).status_code == 200
 
     def test_operator_detail_any(self, client):
         operator = _operator_token(client)

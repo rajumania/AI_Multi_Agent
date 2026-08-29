@@ -1,5 +1,5 @@
 """
-CampusFlow AI - Specialized Multi-Agent Intelligence Package
+AITAM Disaster Response AI - Specialized Multi-Agent Intelligence Package
 """
 from backend.agents.supervisor import SupervisorAgent, supervisor_agent
 from backend.agents.security import SecurityAgent, security_agent
@@ -8,6 +8,7 @@ from backend.agents.transport import TransportAgent, transport_agent
 from backend.agents.communication import CommunicationAgent, communication_agent
 from backend.agents.fire import FireAgent, fire_agent
 from backend.agents.facilities import FacilitiesAgent, facilities_agent
+from backend.agents.risk_prediction import RiskPredictionAgent, risk_prediction_agent
 
 __all__ = [
     "SupervisorAgent",
@@ -24,5 +25,7 @@ __all__ = [
     "fire_agent",
     "FacilitiesAgent",
     "facilities_agent",
+    "RiskPredictionAgent",
+    "risk_prediction_agent",
 ]
 

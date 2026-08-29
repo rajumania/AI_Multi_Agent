@@ -39,7 +39,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ locations, value
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = L.map(containerRef.current, { center: [16.2334, 80.5513], zoom: 16, zoomControl: true });
+    const map = L.map(containerRef.current, { center: [18.56517, 84.19587], zoom: 16, zoomControl: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19,
@@ -80,6 +80,13 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ locations, value
     );
   };
 
+  const setManualCoordinate = (key: 'latitude' | 'longitude', raw: string) => {
+    const number = Number(raw);
+    if (!Number.isFinite(number)) return;
+    const next = value ? { ...value, [key]: number } : { latitude: key === 'latitude' ? number : 0, longitude: key === 'longitude' ? number : 0 };
+    if (next.latitude >= -90 && next.latitude <= 90 && next.longitude >= -180 && next.longitude <= 180) update(next.latitude, next.longitude);
+  };
+
   return (
     <div className="location-picker" style={{ border: '1px solid #bae6fd', borderRadius: 10, overflow: 'hidden', background: '#f8fafc' }}>
       <div className="location-picker-header" style={{ padding: '0.65rem 0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -89,6 +96,10 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ locations, value
         </button>
       </div>
       <div className="location-picker-map" ref={containerRef} style={{ height: 260, width: '100%' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0.65rem 0.8rem 0', background: '#fff' }}>
+        <label style={{ fontSize: '0.68rem', color: '#475569' }}>LATITUDE<input type="number" step="any" min="-90" max="90" value={value?.latitude ?? ''} onChange={(event) => setManualCoordinate('latitude', event.target.value)} style={{ width: '100%', marginTop: 3, padding: 6, border: '1px solid #cbd5e1', borderRadius: 5 }} /></label>
+        <label style={{ fontSize: '0.68rem', color: '#475569' }}>LONGITUDE<input type="number" step="any" min="-180" max="180" value={value?.longitude ?? ''} onChange={(event) => setManualCoordinate('longitude', event.target.value)} style={{ width: '100%', marginTop: 3, padding: 6, border: '1px solid #cbd5e1', borderRadius: 5 }} /></label>
+      </div>
       <div style={{ padding: '0.65rem 0.8rem', background: '#fff', fontSize: '0.72rem', color: '#475569' }}>
         {value ? <><strong>Selected location:</strong> {value.label || 'Exact map point'}<br />Latitude: {value.latitude.toFixed(6)} · Longitude: {value.longitude.toFixed(6)}</> : 'Click the map or drag the marker to select an exact point. GPS is optional.'}
       </div>

@@ -55,7 +55,7 @@ def test_plan_requires_approval_and_dispatch_notifies_only_required_departments(
     assert assessed.json()["incident"]["status"] == "classified"
     assert assessed.json()["incident"]["incident_type"] == "chemical"
     assert set(assessed.json()["incident"]["required_departments"]) == {
-        "MEDICAL", "FIRE", "SECURITY", "FACILITIES", "COMMUNICATION"
+        "MEDICAL", "FIRE", "SECURITY", "FACILITIES", "COMMUNICATION", "TRANSPORT"
     }
 
     orchestrated = client.post(f"/api/v1/incidents/{incident_id}/orchestrate", headers=headers)
@@ -79,10 +79,9 @@ def test_plan_requires_approval_and_dispatch_notifies_only_required_departments(
 
     assignments = client.get(f"/api/v1/incidents/{incident_id}/assignments", headers=headers)
     assert {row["department"] for row in assignments.json()} == {
-        "MEDICAL", "FIRE", "SECURITY", "FACILITIES", "COMMUNICATION"
+        "MEDICAL", "FIRE", "SECURITY", "FACILITIES", "COMMUNICATION", "TRANSPORT"
     }
     assert {row["status"] for row in assignments.json()} == {"NOTIFIED"}
-    assert not any(row["department"] == "TRANSPORT" for row in assignments.json())
 
 
 def test_bike_accident_is_classified_from_report_text(monkeypatch):

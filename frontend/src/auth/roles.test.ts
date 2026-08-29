@@ -17,7 +17,7 @@ import {
 
 const operator: AuthUser = { role: 'operator', username: 'admin', full_name: 'Campus Operator' };
 const admin: AuthUser = { role: 'admin', username: 'root', full_name: 'Site Admin' };
-const citizen: AuthUser = { role: 'user', id: 'u1', full_name: 'Asha Student', email: 'a@vignan.ac.in' };
+const citizen: AuthUser = { role: 'user', id: 'u1', full_name: 'Asha Community Member', email: 'a@aitam.local' };
 const security: AuthUser = { role: 'department', department: 'SECURITY', full_name: 'Guard One' };
 const medicalHead: AuthUser = { role: 'department_head', department: 'medical', full_name: 'Dr. Rao' };
 
@@ -119,13 +119,13 @@ describe('display helpers', () => {
   it('produces a friendly role name', () => {
     expect(roleDisplayName(operator)).toBe('Safety Operations');
     expect(roleDisplayName(admin)).toBe('Administrator');
-    expect(roleDisplayName(citizen)).toBe('Campus Member');
-    expect(roleDisplayName(security)).toBe('Campus Security Staff');
+    expect(roleDisplayName(citizen)).toBe('Community');
+    expect(roleDisplayName(security)).toBe('Security / Public Safety Staff');
     expect(roleDisplayName(medicalHead)).toBe('Medical & Health Lead');
     expect(roleDisplayName(null)).toBe('Guest');
   });
   it('prefers full_name, then username/email', () => {
-    expect(displayName(citizen)).toBe('Asha Student');
+    expect(displayName(citizen)).toBe('Asha Community Member');
     expect(displayName({ role: 'user', email: 'x@y.z' })).toBe('x@y.z');
     expect(displayName(null)).toBe('Guest');
   });

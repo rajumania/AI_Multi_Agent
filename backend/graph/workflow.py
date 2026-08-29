@@ -16,7 +16,7 @@ from backend.services.performance import perf_stage
 
 def create_emergency_graph():
     """
-    Constructs the LangGraph orchestration graph for CAMPUSFLOW AI.
+    Constructs the LangGraph orchestration graph for AITAM Disaster Response AI.
 
     Graph Topology:
     START

@@ -13,7 +13,7 @@ class SeverityEvaluationResult:
 
 class SeverityEngine:
     """
-    Deterministic & Auditable Severity Evaluation Engine for Campus Emergencies.
+    Deterministic & Auditable Severity Evaluation Engine for Disaster Emergencies.
     Replaces opaque LLM outputs with a rule-based, auditable scoring policy.
     """
 
@@ -48,7 +48,7 @@ class SeverityEngine:
         breakdown.append({
             "factor": f"Incident Classification ({inc_type.upper()})",
             "points": base_pts,
-            "rationale": f"Base threat rating for campus {inc_type} emergency."
+            "rationale": f"Base threat rating for {inc_type} emergency."
         })
 
         # 2. Building Occupancy & Location Sensitivity (Max 25)
@@ -59,21 +59,21 @@ class SeverityEngine:
             breakdown.append({
                 "factor": "High-Density Academic Facility",
                 "points": 20,
-                "rationale": f"Located at {location}, a high-occupancy student learning complex."
+                "rationale": f"Located at {location}, a high-occupancy community facility."
             })
         elif is_hostel:
             score += 25
             breakdown.append({
                 "factor": "Residential Hostel Zone",
                 "points": 25,
-                "rationale": f"Located at {location}, high-density 24/7 student residential zone."
+                "rationale": f"Located at {location}, high-density 24/7 residential zone."
             })
         else:
             score += 10
             breakdown.append({
-                "factor": "Campus Grounds / Open Zone",
+                "factor": "Open Response Zone",
                 "points": 10,
-                "rationale": f"Located in general campus quadrant ({location})."
+                "rationale": f"Located in general response area ({location})."
             })
 
         # 3. Casualty & Injury Assessment (Max 25)
@@ -115,7 +115,7 @@ class SeverityEngine:
             breakdown.append({
                 "factor": f"High Corroboration Velocity ({corroboration_count} reports)",
                 "points": 10,
-                "rationale": f"{corroboration_count} independent student/staff reports confirm situation."
+                "rationale": f"{corroboration_count} independent community/staff reports confirm situation."
             })
         elif corroboration_count >= 2:
             score += 5

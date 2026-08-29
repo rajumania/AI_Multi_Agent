@@ -40,11 +40,11 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
   onRefresh,
   liveEvents,
 }) => {
-  const [viewRole, setViewRole] = useState<'operator' | 'student'>('operator');
+  const [viewRole, setViewRole] = useState<'command' | 'community'>('command');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [operatorName, setOperatorName] = useState<string>('Campus Safety Commander');
+  const [operatorName, setOperatorName] = useState<string>('AITAM Response Commander');
   const [approvalNotes, setApprovalNotes] = useState<string>('Approved for emergency deployment.');
   const [resolutionNotes, setResolutionNotes] = useState<string>('Response team confirmed the situation is fully under control.');
   const [closingNotes, setClosingNotes] = useState<string>('Incident administratively closed and verified safe.');
@@ -56,6 +56,7 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
   const [decisionTrace, setDecisionTrace] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<DepartmentAssignment[]>([]);
   const [loadingData, setLoadingData] = useState<boolean>(true);
+  const [evidenceImageUrl, setEvidenceImageUrl] = useState<string | null>(null);
 
   // WebSocket live tracking states
   const [selectedResourceId, setSelectedResourceId] = useState<string | undefined>(undefined);
@@ -106,6 +107,26 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
   useEffect(() => {
     fetchIncidentDetails();
   }, [incident.incident_id]);
+
+  useEffect(() => {
+    let active = true;
+    let objectUrl: string | null = null;
+    setEvidenceImageUrl(null);
+    if (incident.image_url) {
+      void api.getEvidencePreviewUrl(incident.image_url).then((url) => {
+        if (active) {
+          objectUrl = url;
+          setEvidenceImageUrl(url);
+        } else if (url) {
+          URL.revokeObjectURL(url);
+        }
+      }).catch(() => { /* inaccessible evidence is shown by status, never by path */ });
+    }
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [incident.image_url]);
 
   // IncidentCommandView consumes the App-owned event stream. This keeps the
   // command center on one authenticated WebSocket while assignment state is
@@ -165,11 +186,10 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
     setLoadingAction('replan');
     setActionError(null);
     try {
-      const plan = await api.generateResponsePlan(incident.incident_id);
-      setResponsePlan(plan);
-      setActionSuccess('Dynamic re-planning complete: Resources and tactical actions re-evaluated.');
+      await api.replanEvent(incident.incident_id);
+      setActionSuccess('Dynamic re-planning complete: current observations were re-evaluated and a new approval-gated plan was prepared.');
       onRefresh();
-      fetchIncidentDetails();
+      await fetchIncidentDetails();
     } catch (e: any) {
       setActionError(e.message || 'Re-planning failed');
     } finally {
@@ -179,18 +199,18 @@ export const IncidentCommandView: React.FC<IncidentCommandViewProps> = ({
 
   const handleExportBriefing = () => {
     const briefingText = `=====================================================
-CAMPUSFLOW AI — VIGNAN UNIVERSITY EMERGENCY BRIEFING
+AITAM DISASTER RESPONSE AI — DISASTER RESPONSE BRIEFING
 Incident ID: ${incident.incident_id}
 Generated At: ${new Date().toLocaleString()}
-Campus: Vignan University (Vadlamudi, Guntur)
+Region: AITAM Community Response Network
 =====================================================
 
 1. INCIDENT SUMMARY:
 - Emergency Type: ${(incident.incident_type || 'unknown').toUpperCase()}
 - Severity: ${(incident.severity || 'unknown').toUpperCase()}
-- Campus Location: ${incident.location}
+- Incident Location: ${incident.location}
 - Casualties / Injured: ${incident.injured_count === null ? 'Unknown (Unconfirmed)' : incident.injured_count}
-- Reported By: ${incident.reported_by || 'Campus Member'}
+- Reported By: ${incident.reported_by || 'Community Reporter'}
 - Reported Time: ${new Date(incident.created_at).toLocaleString()}
 - Current Status: ${(incident.status || 'unknown').toUpperCase()}
 
@@ -211,11 +231,12 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
 - Resolution Notes: ${incident.resolution_note || 'Situation under active containment'}
 =====================================================`;
 
-    const blob = new Blob([briefingText], { type: 'text/plain;charset=utf-8' });
+    const brandedBriefingText = briefingText;
+    const blob = new Blob([brandedBriefingText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Vignan_Emergency_Briefing_${incident.incident_id}.txt`;
+    link.download = `AITAM_Disaster_Response_Briefing_${incident.incident_id}.txt`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -227,7 +248,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
     try {
       const updatedPlan = await api.decideApproval(responsePlan.plan_id, {
         decision,
-        operator_name: operatorName || 'Campus Safety Commander',
+        operator_name: operatorName || 'AITAM Response Commander',
         notes: approvalNotes
       });
       setResponsePlan(updatedPlan);
@@ -392,13 +413,13 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
       return `The incident has been classified as a ${(incident.severity || 'unknown').toUpperCase()} severity ${(incident.incident_type || 'unknown').toUpperCase()} emergency at ${incident.location}. Response resources are ready to be verified.`;
     }
     if (incident.status === 'response_planning' || incident.status === 'planning') {
-      return `Available campus response resources (security, medical, transport, and facilities) have been evaluated. An action plan is ready for commander review.`;
+      return `Available response resources (security, medical, transport, and facilities) have been evaluated. An action plan is ready for commander review.`;
     }
     if (incident.status === 'awaiting_approval') {
-      return `A recommended response plan has been formulated. An authorized campus safety commander must review and approve the deployment.`;
+      return `A recommended response plan has been formulated. An authorized response commander must review and approve the deployment.`;
     }
     if (incident.status === 'approved' || incident.status === 'authorized') {
-      return `Response plan has been authorized by the safety commander. Ready to initiate physical team dispatch and campus broadcast alerts.`;
+      return `Response plan has been authorized by the safety commander. Ready to initiate physical team dispatch and community alerts.`;
     }
     if (incident.status === 'in_progress' || incident.status === 'response_in_progress' || incident.status === 'dispatched') {
       return `Emergency response is actively in progress. Dispatched units are responding to ${incident.location}; the browser voice and in-app alert are active.`;
@@ -407,10 +428,10 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
       return `Response teams have arrived on-scene at ${incident.location} and confirmed active containment. Responders are working to bring the situation fully under control.`;
     }
     if (incident.status === 'resolved') {
-      return `The emergency at ${incident.location} has been confirmed under control and resolved. Allocated physical assets have been returned to the available campus pool.`;
+      return `The emergency at ${incident.location} has been confirmed under control and resolved. Allocated physical assets have been returned to the available response pool.`;
     }
     if (incident.status === 'closed') {
-      return `This incident record has been administratively closed and archived in the university safety registry.`;
+      return `This incident record has been administratively closed and archived in the AITAM safety registry.`;
     }
     if (incident.status === 'rejected') {
       return `The proposed response plan was rejected by the safety commander. Re-planning or manual tactical intervention is required.`;
@@ -424,13 +445,13 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
       return 'Run the intake assessment to determine emergency classification and severity.';
     }
     if (incident.status === 'classified') {
-      return 'Verify campus resource availability and prepare a structured response plan.';
+      return 'Verify response-resource availability and prepare a structured response plan.';
     }
     if (incident.status === 'response_planning' || incident.status === 'awaiting_approval') {
       return 'An authorized safety commander must review and approve the recommended emergency response.';
     }
     if (incident.status === 'approved') {
-      return 'Initiate the response workflow to dispatch physical units and notify affected campus zones.';
+      return 'Initiate the response workflow to dispatch physical units and notify affected communities.';
     }
     if (incident.status === 'in_progress' || incident.status === 'dispatched') {
       return 'First responders arrive on-scene and confirm initial containment.';
@@ -439,7 +460,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
       return 'Maintain on-scene operations until the situation is confirmed under control, then resolve the incident.';
     }
     if (incident.status === 'resolved') {
-      return 'An authorized operator can review the resolution notes and close the incident record.';
+      return 'An authorized commander can review the resolution notes and close the incident record.';
     }
     if (incident.status === 'closed') {
       return 'Incident lifecycle is complete. No further action required.';
@@ -452,12 +473,12 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
     switch (incident.incident_type) {
       case 'fire':
         return {
-          title: '🔥 Campus Fire Safety Guidance',
+          title: '🔥 Fire Safety Guidance',
           steps: [
             'Evacuate the building immediately using the nearest marked stairwells. Do NOT use elevators.',
             'Move to designated open assembly muster points (NTR Convocation Grounds or Quadrangle).',
             'Keep roads and building entrances clear for emergency fire and medical vehicles.',
-            'Do not re-enter the facility until all-clear is confirmed by campus safety authorities.'
+            'Do not re-enter the facility until all-clear is confirmed by response authorities.'
           ]
         };
       case 'medical':
@@ -466,7 +487,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
           steps: [
             'Keep the affected person calm and still. Do not move injured individuals unless in immediate physical danger.',
             'Clear the surrounding corridor to allow fast stretcher and paramedic access.',
-            'Campus Health Centre primary ambulance dispatched with trained first-responders.'
+            'Primary ambulance dispatched with trained first responders.'
           ]
         };
       case 'security':
@@ -475,12 +496,12 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
           steps: [
             'Follow steward guidance and move away from the reported incident sector.',
             'Secure exterior doors if in an adjacent classroom or lab.',
-            'Carry student/staff identification and report suspicious activity to Security Alpha.'
+            'Carry identification and report suspicious activity to Public Safety.'
           ]
         };
       default:
         return {
-          title: '⚠️ General Campus Emergency Guidance',
+          title: '⚠️ General Disaster Response Guidance',
           steps: [
             'Remain calm and stay clear of the affected incident zone.',
             'Follow the browser voice and in-app alert. SMS and other external channels are optional integrations.',
@@ -492,6 +513,8 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
 
   const safetyInfo = getSafetyGuidance();
   const currentStatusObj = getStatusDisplay(incident.status);
+  const detectionEvidence = incident.detection_evidence as Record<string, any> | null | undefined;
+  const supportingEvidence = Array.isArray(detectionEvidence?.supporting_evidence) ? detectionEvidence.supporting_evidence : [];
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -525,7 +548,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                 {getSeverityBadge(incident.severity)}
               </div>
               <div style={{ fontSize: '0.78125rem', color: '#64748b', marginTop: '0.15rem' }}>
-                📍 {incident.location} • Reported {new Date(incident.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Vignan University (Vadlamudi)
+                📍 {incident.location} • Reported {new Date(incident.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • AITAM Disaster Response Network
               </div>
               <div style={{ fontSize: '0.72rem', marginTop: '0.35rem', color: incident.ai_provider_status === 'FALLBACK_ACTIVE' ? '#b45309' : '#0369a1', fontWeight: 700 }}>
                 AI PROVIDER: {incident.ai_provider_status || 'PENDING'}
@@ -544,30 +567,30 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
               fontWeight: 600
             }}>
               <button
-                onClick={() => setViewRole('operator')}
+                onClick={() => setViewRole('command')}
                 style={{
-                  background: viewRole === 'operator' ? '#ffffff' : 'transparent',
-                  color: viewRole === 'operator' ? '#0f172a' : '#64748b',
+                  background: viewRole === 'command' ? '#ffffff' : 'transparent',
+                  color: viewRole === 'command' ? '#0f172a' : '#64748b',
                   border: 'none',
                   padding: '0.25rem 0.65rem',
                   borderRadius: '4px',
                   cursor: 'pointer'
                 }}
               >
-                Operator View
+                Command View
               </button>
               <button
-                onClick={() => setViewRole('student')}
+                onClick={() => setViewRole('community')}
                 style={{
-                  background: viewRole === 'student' ? '#ffffff' : 'transparent',
-                  color: viewRole === 'student' ? '#0f172a' : '#64748b',
+                  background: viewRole === 'community' ? '#ffffff' : 'transparent',
+                  color: viewRole === 'community' ? '#0f172a' : '#64748b',
                   border: 'none',
                   padding: '0.25rem 0.65rem',
                   borderRadius: '4px',
                   cursor: 'pointer'
                 }}
               >
-                Student Tracker
+                Community Tracker
               </button>
             </div>
 
@@ -770,7 +793,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
 
             <div className="incident-meta-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem' }}>
               <div className="meta-card">
-                <div className="meta-title">Campus Location</div>
+                <div className="meta-title">Incident Location</div>
                 <div className="meta-value" style={{ fontSize: '0.8125rem', color: '#0284c7', fontWeight: 600 }}>
                   📍 {incident.location}
                 </div>
@@ -799,7 +822,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
               <div className="meta-card">
                 <div className="meta-title">Reported By</div>
                 <div className="meta-value" style={{ fontSize: '0.8125rem' }}>
-                  {incident.reported_by || 'Campus Reporter'}
+                  {incident.reported_by || 'Community Reporter'}
                 </div>
               </div>
             </div>
@@ -811,6 +834,23 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                 explanation={incident.summary}
               />
             </div>
+            {detectionEvidence && (
+              <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '7px', fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap', marginBottom: '.45rem' }}>
+                  <strong style={{ color: '#0f172a' }}>Evidence Fusion Assessment</strong>
+                  <span style={{ color: detectionEvidence.evidence_status === 'SUPPORTED' ? '#166534' : '#92400e', fontWeight: 800 }}>{String(detectionEvidence.evidence_status || 'UNKNOWN')}</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '.45rem', color: '#334155' }}>
+                  <span><strong>Likely hazard:</strong> {String(detectionEvidence.likely_hazard || detectionEvidence.detected_hazard || 'UNKNOWN').toUpperCase()}</span>
+                  <span><strong>Confidence:</strong> {detectionEvidence.confidence == null ? '—' : `${Math.round(Number(detectionEvidence.confidence) * 100)}%`}</span>
+                  <span><strong>Coordinates:</strong> {incident.latitude == null || incident.longitude == null ? 'Not supplied' : `${incident.latitude.toFixed(6)}, ${incident.longitude.toFixed(6)}`}</span>
+                  <span><strong>Image analysis:</strong> {String(detectionEvidence.image_analysis?.status || detectionEvidence.image_analysis || 'NOT_PROVIDED')}</span>
+                </div>
+                {evidenceImageUrl && <img src={evidenceImageUrl} alt="Uploaded incident evidence" style={{ marginTop: '.65rem', maxWidth: '260px', maxHeight: '180px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }} />}
+                {supportingEvidence.length > 0 && <div style={{ marginTop: '.5rem', color: '#475569' }}><strong>Supporting evidence:</strong> {supportingEvidence.map((item: unknown) => String(item)).join(' · ')}</div>}
+                {Array.isArray(detectionEvidence.data_sources) && detectionEvidence.data_sources.length > 0 && <div style={{ marginTop: '.35rem', color: '#64748b' }}><strong>Sources/status:</strong> {detectionEvidence.data_sources.map((item: unknown) => String(item)).join(', ')}</div>}
+              </div>
+            )}
             <div style={{ marginTop: '0.75rem', padding: '0.65rem 0.75rem', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '7px', fontSize: '0.75rem', color: '#1e3a8a' }}>
               <strong>AI-required departments: </strong>
               {(incident.required_departments || []).length > 0 ? incident.required_departments?.join(' • ') : 'Awaiting AI routing assessment'}
@@ -924,7 +964,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
 
               {/* Allocated Resources */}
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-                Allocated Campus Resources for This Incident:
+                Allocated Response Resources for This Incident:
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
                 {responsePlan.allocated_resources.map((rid) => {
@@ -959,7 +999,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                           {isBusy ? 'DISPATCHED' : 'AVAILABLE'}
                         </span>
                       </div>
-                      <div style={{ color: '#334155', marginTop: '2px' }}>{resObj?.name || 'Assigned Campus Unit'}</div>
+                      <div style={{ color: '#334155', marginTop: '2px' }}>{resObj?.name || 'Assigned Response Unit'}</div>
                       <div style={{ color: '#64748b', fontSize: '0.7rem' }}>📍 {resObj?.location || incident.location}</div>
                     </div>
                   );
@@ -981,9 +1021,9 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
           )}
 
           {/* ============================================================ */}
-          {/* 5. OPERATOR ACTION CONTROLS & COMMAND CENTER */}
+          {/* 5. COMMAND ACTION CONTROLS & COMMAND CENTER */}
           {/* ============================================================ */}
-          {viewRole === 'operator' && (
+          {viewRole === 'command' && (
             <div style={{
               background: '#ffffff',
               border: '2px solid #0284c7',
@@ -1001,7 +1041,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                   decision once a real plan is ready. */}
               {(incident.status === 'reported' || incident.status === 'analyzing' || incident.status === 'classified' || incident.status === 'response_planning') && !responsePlan && (
                 <p style={{ fontSize: '0.8125rem', color: '#334155', margin: 0 }}>
-                  AI assessment and response-plan preparation are in progress. Operator authorization will appear when the plan is ready.
+                  AI assessment and response-plan preparation are in progress. Commander authorization will appear when the plan is ready.
                 </p>
               )}
 
@@ -1108,7 +1148,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                         </div>
                         <div style={{ background: '#f8fafc', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.7rem' }}>
                           <span style={{ color: '#b45309', fontWeight: 700 }}>• BROWSER VOICE — REAL</span>
-                          <div style={{ color: '#64748b', fontSize: '0.65rem' }}>Status: OPERATOR CONTROLLED</div>
+                          <div style={{ color: '#64748b', fontSize: '0.65rem' }}>Status: COMMAND CONTROLLED</div>
                         </div>
                         <div style={{ background: '#f8fafc', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.7rem' }}>
                           <span style={{ color: '#64748b', fontWeight: 700 }}>○ PHONE / RADIO — OPTIONAL</span>
@@ -1215,9 +1255,9 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
           )}
 
           {/* ============================================================ */}
-          {/* 6. STUDENT / REPORTER TRACKING VIEW */}
+          {/* 6. COMMUNITY / REPORTER TRACKING VIEW */}
           {/* ============================================================ */}
-          {viewRole === 'student' && (
+          {viewRole === 'community' && (
             <div style={{
               background: '#ffffff',
               border: '1px solid #e2e8f0',
@@ -1226,10 +1266,10 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
               boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
             }}>
               <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
-                📢 Student Emergency Status Tracker
+                📢 Community Emergency Status Tracker
               </div>
               <p style={{ fontSize: '0.8125rem', color: '#475569', marginBottom: '1rem' }}>
-                Your report <strong>#{incident.incident_id}</strong> is registered with Vignan University Emergency Services. Below is the verified live status.
+                Your report <strong>#{incident.incident_id}</strong> is registered with AITAM Emergency Services. Below is the verified live status.
               </p>
 
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.85rem', marginBottom: '1rem' }}>
@@ -1257,9 +1297,9 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
           )}
 
           {/* ============================================================ */}
-          {/* 7. SAFETY GUIDANCE NOTICE (Operator view) */}
+          {/* 7. SAFETY GUIDANCE NOTICE (Command view) */}
           {/* ============================================================ */}
-          {viewRole === 'operator' && (
+          {viewRole === 'command' && (
             <div style={{
               background: '#fef2f2',
               border: '1px solid #fecaca',
@@ -1338,6 +1378,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
                   incidents={[incident]}
                   activeIncidentId={incident.incident_id}
                   selectedResourceId={selectedResourceId}
+                  liveEvents={liveEvents}
                 />
               </div>
 
@@ -1426,7 +1467,7 @@ ${responsePlan ? responsePlan.allocated_resources.join(', ') : 'None assigned'}
           alignItems: 'center'
         }}>
           <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-            Vignan University Campus Operations Center • Vadlamudi, Guntur
+            AITAM Disaster Response Operations Center
           </div>
 
           <button className="btn btn-outline" onClick={onClose}>

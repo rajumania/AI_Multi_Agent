@@ -1,7 +1,8 @@
 import math
 from typing import Dict, List, Tuple, Set, Optional, Any
 from backend.config import settings
-from backend.services.campus_locations import CAMPUS_NODE_COORDINATES, nearest_campus_node
+from backend.services.campus_locations import CAMPUS_NODE_COORDINATES, nearest_campus_node, project_campus_coordinate
+from backend.services.routing_providers import OSRMProvider, RouteProviderUnavailable
 
 
 # Backwards-compatible export used by the existing graph and tests.  The
@@ -41,6 +42,13 @@ ROAD_GEOMETRIES = {
     ("admin_roundabout", "v_block_junc"): [(16.2332, 80.5511), (16.2330, 80.5517), (16.2328, 80.5523)],
     ("v_block_junc", "v_block"): [(16.2328, 80.5523), (16.2325, 80.5525)],
     ("v_block_junc", "hostel_junc"): [(16.2328, 80.5523), (16.2324, 80.5526), (16.2318, 80.5530)],
+}
+
+# Preserve the hand-authored graph shape while relocating its old campus
+# fixture offsets to the verified AITAM Tekkali anchor.
+ROAD_GEOMETRIES = {
+    edge: [project_campus_coordinate(*point) for point in points]
+    for edge, points in ROAD_GEOMETRIES.items()
 }
 
 class RoadNetwork:
@@ -161,7 +169,7 @@ class RoadNetwork:
             return "v-block"
         if "library" in loc or "ntr" in loc:
             return "library"
-        if "auditorium" in loc or "convocation" in loc or "vignan vihar" in loc or "oat" in loc:
+        if "auditorium" in loc or "convocation" in loc or "oat" in loc:
             return "convocation"
         if "sports" in loc or "stadium" in loc or "arena" in loc or "ground" in loc:
             return "sports"
@@ -169,7 +177,7 @@ class RoadNetwork:
             return "sac"
         if "hostel" in loc or "mahalakshmi" in loc or "vasishta" in loc or "valmiki" in loc:
             return "hostels"
-        if "gate" in loc or "entrance" in loc or "vadlamudi" in loc:
+        if "gate" in loc or "entrance" in loc:
             return "gate"
         if "medical" in loc or "health" in loc or "first aid" in loc:
             return "health_centre"
@@ -207,44 +215,14 @@ class RoadNetwork:
         Queries real OpenStreetMap OSRM driving route API.
         Returns coordinates [lat, lng], distance (meters), duration (seconds), and steps.
         """
-        import urllib.request
-        import json
-        
-        url = f"{settings.ROUTING_BASE_URL}/route/v1/driving/{origin_lng},{origin_lat};{dest_lng},{dest_lat}?overview=full&geometries=geojson&steps=true"
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "CampusFlow-AI/1.0"})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    routes = data.get("routes", [])
-                    if routes:
-                        primary = routes[0]
-                        geojson_coords = primary.get("geometry", {}).get("coordinates", [])
-                        # Convert OSRM [lng, lat] to Leaflet [lat, lng]
-                        latlng_coords = [(pt[1], pt[0]) for pt in geojson_coords]
-                        
-                        raw_steps = primary.get("legs", [{}])[0].get("steps", [])
-                        step_list = []
-                        for s in raw_steps:
-                            maneuver = s.get("maneuver", {})
-                            name = s.get("name") or "Campus Road"
-                            m_type = maneuver.get("type", "turn")
-                            step_list.append({
-                                "instruction": f"{m_type.capitalize()} onto {name}",
-                                "distance_meters": int(s.get("distance", 0)),
-                                "duration_seconds": int(s.get("duration", 0))
-                            })
-                            
-                        return {
-                            "coordinates": latlng_coords,
-                            "distance_meters": int(primary.get("distance", 0)),
-                            "eta_seconds": int(primary.get("duration", 0)),
-                            "routing_engine": "OSRM (OpenStreetMap)",
-                            "steps": step_list
-                        }
-        except Exception as e:
-            # Clean fallback to local graph if OSRM is unreachable/offline
-            pass
+            if settings.ROUTING_PROVIDER.strip().lower() not in {"osrm", "openstreetmap", "open_street_map"}:
+                return None
+            return OSRMProvider().route(origin_lat, origin_lng, dest_lat, dest_lng)
+        except RouteProviderUnavailable:
+            # Clean fallback to the verified local road graph if OSRM is
+            # unreachable/offline. The returned route is marked FALLBACK.
+            return None
         return None
 
     def get_route_details(self, origin_node: str, dest_node: str) -> Dict[str, Any]:
@@ -254,8 +232,8 @@ class RoadNetwork:
         """
         from backend.config import settings
         
-        orig_coords = NODES.get(origin_node, (16.2334, 80.5513))
-        dest_coords = NODES.get(dest_node, (16.2334, 80.5513))
+        orig_coords = NODES.get(origin_node, (18.56517, 84.19587))
+        dest_coords = NODES.get(dest_node, (18.56517, 84.19587))
         
         osrm_res = self.fetch_osrm_route(orig_coords[0], orig_coords[1], dest_coords[0], dest_coords[1])
         if osrm_res and len(osrm_res.get("coordinates", [])) > 1:
@@ -278,6 +256,7 @@ class RoadNetwork:
             "eta_seconds": eta_sec,
             "routing_engine": "Campus Graph Engine",
             "source": origin_node,
+            "data_status": "FALLBACK",
             "destination": dest_node,
             "route": path,
             "steps": [
@@ -327,6 +306,7 @@ class RoadNetwork:
                     "eta_seconds": eta_seconds,
                     "routing_engine": "Campus Graph Engine",
                     "source": "CAMPUS_GRAPH",
+                    "data_status": "FALLBACK",
                     "origin_node": origin_node,
                     "destination_node": destination_node,
                     "route": path,

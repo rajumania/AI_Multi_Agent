@@ -1,0 +1,372 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/pages/TravelSafetyPage.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=ab160a9a"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=ab160a9a"; const useState = __vite__cjsImport3_react["useState"];
+import { AlertTriangle, CheckCircle2, Compass, RefreshCw, ShieldAlert } from "/node_modules/.vite/deps/lucide-react.js?v=ab160a9a";
+import { api } from "/src/services/api.ts?t=1787951368129";
+export const TravelSafetyPage = () => {
+  _s();
+  const [destination, setDestination] = useState("AITAM institutional location");
+  const [currentLocation, setCurrentLocation] = useState("");
+  const [latitude, setLatitude] = useState("18.56517");
+  const [longitude, setLongitude] = useState("84.19587");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const check = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const parsedLatitude = latitude.trim() ? Number(latitude) : void 0;
+      const parsedLongitude = longitude.trim() ? Number(longitude) : void 0;
+      if (parsedLatitude == null !== (parsedLongitude == null) || parsedLatitude != null && (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude))) throw new Error("Enter both valid destination coordinates or leave both blank.");
+      setResult(await api.checkTravelSafety(destination.trim(), currentLocation.trim() || void 0, parsedLatitude, parsedLongitude));
+    } catch (err) {
+      setError(err?.message || "Unable to evaluate destination safety.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const riskColor = result?.recommendation === "SAFE" ? "#047857" : result?.recommendation === "CAUTION" ? "#b45309" : "#b91c1c";
+  return /* @__PURE__ */ jsxDEV("div", { className: "app-content", children: [
+    /* @__PURE__ */ jsxDEV("div", { className: "dashboard-title-row", children: [
+      /* @__PURE__ */ jsxDEV("div", { children: [
+        /* @__PURE__ */ jsxDEV("h2", { children: "Destination Safety" }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 56,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("p", { children: "Decision-support travel guidance based on current evidence, active warnings, weather, and route conditions." }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 57,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+        lineNumber: 55,
+        columnNumber: 9
+      }, this),
+      /* @__PURE__ */ jsxDEV("span", { className: "demo-label", children: "LIVE API · DEMO DATA CLEARLY LABELLED" }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+        lineNumber: 59,
+        columnNumber: 9
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+      lineNumber: 54,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV("section", { className: "panel-card", style: { padding: "1.25rem", maxWidth: 920 }, children: [
+      /* @__PURE__ */ jsxDEV("form", { onSubmit: check, style: { display: "grid", gridTemplateColumns: "1.2fr 1fr .7fr .7fr auto", gap: ".75rem", alignItems: "end" }, children: [
+        /* @__PURE__ */ jsxDEV("label", { className: "form-label", children: [
+          "Destination",
+          /* @__PURE__ */ jsxDEV("input", { className: "form-input", value: destination, onChange: (e) => setDestination(e.target.value), placeholder: "Zone or region", required: true }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 63,
+            columnNumber: 52
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 63,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("label", { className: "form-label", children: [
+          "Current location (optional)",
+          /* @__PURE__ */ jsxDEV("input", { className: "form-input", value: currentLocation, onChange: (e) => setCurrentLocation(e.target.value), placeholder: "For route context" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 64,
+            columnNumber: 68
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 64,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("label", { className: "form-label", children: [
+          "Latitude",
+          /* @__PURE__ */ jsxDEV("input", { className: "form-input", value: latitude, onChange: (e) => setLatitude(e.target.value), placeholder: "18.56517", inputMode: "decimal" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 65,
+            columnNumber: 49
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 65,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("label", { className: "form-label", children: [
+          "Longitude",
+          /* @__PURE__ */ jsxDEV("input", { className: "form-input", value: longitude, onChange: (e) => setLongitude(e.target.value), placeholder: "84.19587", inputMode: "decimal" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 66,
+            columnNumber: 50
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 66,
+          columnNumber: 11
+        }, this),
+        /* @__PURE__ */ jsxDEV("button", { className: "btn btn-primary", type: "submit", disabled: loading, children: [
+          /* @__PURE__ */ jsxDEV(RefreshCw, { size: 15, className: loading ? "spin" : "" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 67,
+            columnNumber: 80
+          }, this),
+          " Check safety"
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 67,
+          columnNumber: 11
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+        lineNumber: 62,
+        columnNumber: 9
+      }, this),
+      error && /* @__PURE__ */ jsxDEV("p", { style: { color: "#b91c1c", marginTop: "1rem" }, children: [
+        /* @__PURE__ */ jsxDEV(AlertTriangle, { size: 15, style: { verticalAlign: "middle" } }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 69,
+          columnNumber: 70
+        }, this),
+        " ",
+        error
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+        lineNumber: 69,
+        columnNumber: 19
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+      lineNumber: 61,
+      columnNumber: 7
+    }, this),
+    result && /* @__PURE__ */ jsxDEV("section", { className: "panel-card", style: { padding: "1.25rem", maxWidth: 920, marginTop: "1rem" }, children: [
+      /* @__PURE__ */ jsxDEV("div", { style: { display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", alignItems: "center" }, children: [
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("div", { className: "panel-title", children: [
+            /* @__PURE__ */ jsxDEV(Compass, { size: 18 }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+              lineNumber: 74,
+              columnNumber: 47
+            }, this),
+            " ",
+            result.destination
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 74,
+            columnNumber: 18
+          }, this),
+          /* @__PURE__ */ jsxDEV("small", { children: [
+            "Last updated ",
+            new Date(result.last_updated).toLocaleString(),
+            " · ",
+            result.data_status || "UNKNOWN",
+            " · ",
+            (result.data_sources || []).join(", ") || "No provider source"
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 74,
+            columnNumber: 95
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 74,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { style: { color: riskColor, fontWeight: 800, letterSpacing: ".05em" }, children: [
+          /* @__PURE__ */ jsxDEV(ShieldAlert, { size: 18, style: { verticalAlign: "middle" } }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 75,
+            columnNumber: 88
+          }, this),
+          " ",
+          result.recommendation
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 75,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+        lineNumber: 73,
+        columnNumber: 11
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { className: "stats-grid", style: { marginTop: "1rem" }, children: [
+        /* @__PURE__ */ jsxDEV("div", { className: "stat-card", children: [
+          /* @__PURE__ */ jsxDEV("span", { children: "Risk score" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 78,
+            columnNumber: 40
+          }, this),
+          /* @__PURE__ */ jsxDEV("strong", { children: [
+            Math.round(result.risk_score),
+            " / 100"
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 78,
+            columnNumber: 63
+          }, this),
+          /* @__PURE__ */ jsxDEV("small", { children: result.risk_level }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 78,
+            columnNumber: 117
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 78,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { className: "stat-card", children: [
+          /* @__PURE__ */ jsxDEV("span", { children: "Route status" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 79,
+            columnNumber: 40
+          }, this),
+          /* @__PURE__ */ jsxDEV("strong", { children: result.route_status }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 79,
+            columnNumber: 65
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 79,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { className: "stat-card", children: [
+          /* @__PURE__ */ jsxDEV("span", { children: "Active alerts" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 80,
+            columnNumber: 40
+          }, this),
+          /* @__PURE__ */ jsxDEV("strong", { children: result.active_alerts.length }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 80,
+            columnNumber: 66
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 80,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+        lineNumber: 77,
+        columnNumber: 11
+      }, this),
+      /* @__PURE__ */ jsxDEV("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginTop: "1rem" }, children: [
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("h3", { children: "Why?" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 83,
+            columnNumber: 18
+          }, this),
+          /* @__PURE__ */ jsxDEV("ul", { children: result.reasons.map((reason) => /* @__PURE__ */ jsxDEV("li", { children: reason }, reason, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 83,
+            columnNumber: 67
+          }, this)) }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 83,
+            columnNumber: 31
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 83,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { children: [
+          /* @__PURE__ */ jsxDEV("h3", { children: "Hazards & conditions" }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 84,
+            columnNumber: 18
+          }, this),
+          /* @__PURE__ */ jsxDEV("p", { children: result.hazards.length ? result.hazards.join(" · ") : "No specific hazard signal returned." }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 84,
+            columnNumber: 47
+          }, this),
+          /* @__PURE__ */ jsxDEV("p", { style: { marginTop: ".5rem" }, children: result.weather_summary }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 84,
+            columnNumber: 146
+          }, this),
+          result.recommendation === "SAFE" ? /* @__PURE__ */ jsxDEV("p", { children: [
+            /* @__PURE__ */ jsxDEV(CheckCircle2, { size: 15 }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+              lineNumber: 84,
+              columnNumber: 247
+            }, this),
+            " Continue to monitor updates."
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 84,
+            columnNumber: 244
+          }, this) : /* @__PURE__ */ jsxDEV("p", { style: { color: "#b91c1c" }, children: [
+            /* @__PURE__ */ jsxDEV(AlertTriangle, { size: 15 }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+              lineNumber: 84,
+              columnNumber: 341
+            }, this),
+            " Conditions can change; follow verified local guidance."
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+            lineNumber: 84,
+            columnNumber: 309
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+          lineNumber: 84,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+        lineNumber: 82,
+        columnNumber: 11
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+      lineNumber: 72,
+      columnNumber: 7
+    }, this)
+  ] }, void 0, true, {
+    fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx",
+    lineNumber: 53,
+    columnNumber: 5
+  }, this);
+};
+_s(TravelSafetyPage, "+BgvvtRXZrMda/40weTVab6Ofws=");
+_c = TravelSafetyPage;
+var _c;
+$RefreshReg$(_c, "TravelSafetyPage");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/pages/TravelSafetyPage.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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LFNBYkY7QUFBQTtBQUFBO0FBQUE7QUFBQSxXQWNBO0FBQUEsT0FqQ0o7QUFBQTtBQUFBO0FBQUE7QUFBQSxTQW1DQTtBQUVKO0FBQUV2QyxHQWpFV0Qsa0JBQTBCO0FBQUEsS0FBMUJBO0FBQTBCLElBQUFpRTtBQUFBLGFBQUFBLElBQUEiLCJuYW1lcyI6WyJ1c2VTdGF0ZSIsIkFsZXJ0VHJpYW5nbGUiLCJDaGVja0NpcmNsZTIiLCJDb21wYXNzIiwiUmVmcmVzaEN3IiwiU2hpZWxkQWxlcnQiLCJhcGkiLCJUcmF2ZWxTYWZldHlQYWdlIiwiX3MiLCJkZXN0aW5hdGlvbiIsInNldERlc3RpbmF0aW9uIiwiY3VycmVudExvY2F0aW9uIiwic2V0Q3VycmVudExvY2F0aW9uIiwibGF0aXR1ZGUiLCJzZXRMYXRpdHVkZSIsImxvbmdpdHVkZSIsInNldExvbmdpdHVkZSIsInJlc3VsdCIsInNldFJlc3VsdCIsImxvYWRpbmciLCJzZXRMb2FkaW5nIiwiZXJyb3IiLCJzZXRFcnJvciIsImNoZWNrIiwiZXZlbnQiLCJwcmV2ZW50RGVmYXVsdCIsInBhcnNlZExhdGl0dWRlIiwidHJpbSIsIk51bWJlciIsInVuZGVmaW5lZCIsInBhcnNlZExvbmdpdHVkZSIsImlzRmluaXRlIiwiRXJyb3IiLCJjaGVja1RyYXZlbFNhZmV0eSIsImVyciIsIm1lc3NhZ2UiLCJyaXNrQ29sb3IiLCJyZWNvbW1lbmRhdGlvbiIsInBhZGRpbmciLCJtYXhXaWR0aCIsImRpc3BsYXkiLCJncmlkVGVtcGxhdGVDb2x1bW5zIiwiZ2FwIiwiYWxpZ25JdGVtcyIsImUiLCJ0YXJnZXQiLCJ2YWx1ZSIsImNvbG9yIiwibWFyZ2luVG9wIiwidmVydGljYWxBbGlnbiIsImp1c3RpZnlDb250ZW50IiwiZmxleFdyYXAiLCJEYXRlIiwibGFzdF91cGRhdGVkIiwidG9Mb2NhbGVTdHJpbmciLCJkYXRhX3N0YXR1cyIsImRhdGFfc291cmNlcyIsImpvaW4iLCJmb250V2VpZ2h0IiwibGV0dGVyU3BhY2luZyIsIk1hdGgiLCJyb3VuZCIsInJpc2tfc2NvcmUiLCJyaXNrX2xldmVsIiwicm91dGVfc3RhdHVzIiwiYWN0aXZlX2FsZXJ0cyIsImxlbmd0aCIsInJlYXNvbnMiLCJtYXAiLCJyZWFzb24iLCJoYXphcmRzIiwid2VhdGhlcl9zdW1tYXJ5IiwiX2MiXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsiVHJhdmVsU2FmZXR5UGFnZS50c3giXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IFJlYWN0LCB7IHVzZVN0YXRlIH0gZnJvbSAncmVhY3QnO1xuaW1wb3J0IHsgQWxlcnRUcmlhbmdsZSwgQ2hlY2tDaXJjbGUyLCBDb21wYXNzLCBSZWZyZXNoQ3csIFNoaWVsZEFsZXJ0IH0gZnJvbSAnbHVjaWRlLXJlYWN0JztcbmltcG9ydCB7IGFwaSB9IGZyb20gJy4uL3NlcnZpY2VzL2FwaSc7XG5pbXBvcnQgeyBUcmF2ZWxTYWZldHlSZXNwb25zZSB9IGZyb20gJy4uL3R5cGVzJztcblxuZXhwb3J0IGNvbnN0IFRyYXZlbFNhZmV0eVBhZ2U6IFJlYWN0LkZDID0gKCkgPT4ge1xuICBjb25zdCBbZGVzdGluYXRpb24sIHNldERlc3RpbmF0aW9uXSA9IHVzZVN0YXRlKCdBSVRBTSBpbnN0aXR1dGlvbmFsIGxvY2F0aW9uJyk7XG4gIGNvbnN0IFtjdXJyZW50TG9jYXRpb24sIHNldEN1cnJlbnRMb2NhdGlvbl0gPSB1c2VTdGF0ZSgnJyk7XG4gIGNvbnN0IFtsYXRpdHVkZSwgc2V0TGF0aXR1ZGVdID0gdXNlU3RhdGUoJzE4LjU2NTE3Jyk7XG4gIGNvbnN0IFtsb25naXR1ZGUsIHNldExvbmdpdHVkZV0gPSB1c2VTdGF0ZSgnODQuMTk1ODcnKTtcbiAgY29uc3QgW3Jlc3VsdCwgc2V0UmVzdWx0XSA9IHVzZVN0YXRlPFRyYXZlbFNhZmV0eVJlc3BvbnNlIHwgbnVsbD4obnVsbCk7XG4gIGNvbnN0IFtsb2FkaW5nLCBzZXRMb2FkaW5nXSA9IHVzZVN0YXRlKGZhbHNlKTtcbiAgY29uc3QgW2Vycm9yLCBzZXRFcnJvcl0gPSB1c2VTdGF0ZTxzdHJpbmcgfCBudWxsPihudWxsKTtcblxuICBjb25zdCBjaGVjayA9IGFzeW5jIChldmVudDogUmVhY3QuRm9ybUV2ZW50KSA9PiB7XG4gICAgZXZlbnQucHJldmVudERlZmF1bHQoKTtcbiAgICBzZXRMb2FkaW5nKHRydWUpO1xuICAgIHNldEVycm9yKG51bGwpO1xuICAgIHRyeSB7XG4gICAgICBjb25zdCBwYXJzZWRMYXRpdHVkZSA9IGxhdGl0dWRlLnRyaW0oKSA/IE51bWJlcihsYXRpdHVkZSkgOiB1bmRlZmluZWQ7XG4gICAgICBjb25zdCBwYXJzZWRMb25naXR1ZGUgPSBsb25naXR1ZGUudHJpbSgpID8gTnVtYmVyKGxvbmdpdHVkZSkgOiB1bmRlZmluZWQ7XG4gICAgICBpZiAoKHBhcnNlZExhdGl0dWRlID09IG51bGwpICE9PSAocGFyc2VkTG9uZ2l0dWRlID09IG51bGwpIHx8IChwYXJzZWRMYXRpdHVkZSAhPSBudWxsICYmICghTnVtYmVyLmlzRmluaXRlKHBhcnNlZExhdGl0dWRlKSB8fCAhTnVtYmVyLmlzRmluaXRlKHBhcnNlZExvbmdpdHVkZSkpKSkgdGhyb3cgbmV3IEVycm9yKCdFbnRlciBib3RoIHZhbGlkIGRlc3RpbmF0aW9uIGNvb3JkaW5hdGVzIG9yIGxlYXZlIGJvdGggYmxhbmsuJyk7XG4gICAgICBzZXRSZXN1bHQoYXdhaXQgYXBpLmNoZWNrVHJhdmVsU2FmZXR5KGRlc3RpbmF0aW9uLnRyaW0oKSwgY3VycmVudExvY2F0aW9uLnRyaW0oKSB8fCB1bmRlZmluZWQsIHBhcnNlZExhdGl0dWRlLCBwYXJzZWRMb25naXR1ZGUpKTtcbiAgICB9IGNhdGNoIChlcnI6IGFueSkge1xuICAgICAgc2V0RXJyb3IoZXJyPy5tZXNzYWdlIHx8ICdVbmFibGUgdG8gZXZhbHVhdGUgZGVzdGluYXRpb24gc2FmZXR5LicpO1xuICAgIH0gZmluYWxseSB7XG4gICAgICBzZXRMb2FkaW5nKGZhbHNlKTtcbiAgICB9XG4gIH07XG5cbiAgY29uc3Qgcmlza0NvbG9yID0gcmVzdWx0Py5yZWNvbW1lbmRhdGlvbiA9PT0gJ1NBRkUnID8gJyMwNDc4NTcnIDogcmVzdWx0Py5yZWNvbW1lbmRhdGlvbiA9PT0gJ0NBVVRJT04nID8gJyNiNDUzMDknIDogJyNiOTFjMWMnO1xuXG4gIHJldHVybiAoXG4gICAgPGRpdiBjbGFzc05hbWU9XCJhcHAtY29udGVudFwiPlxuICAgICAgPGRpdiBjbGFzc05hbWU9XCJkYXNoYm9hcmQtdGl0bGUtcm93XCI+XG4gICAgICAgIDxkaXY+XG4gICAgICAgICAgPGgyPkRlc3RpbmF0aW9uIFNhZmV0eTwvaDI+XG4gICAgICAgICAgPHA+RGVjaXNpb24tc3VwcG9ydCB0cmF2ZWwgZ3VpZGFuY2UgYmFzZWQgb24gY3VycmVudCBldmlkZW5jZSwgYWN0aXZlIHdhcm5pbmdzLCB3ZWF0aGVyLCBhbmQgcm91dGUgY29uZGl0aW9ucy48L3A+XG4gICAgICAgIDwvZGl2PlxuICAgICAgICA8c3BhbiBjbGFzc05hbWU9XCJkZW1vLWxhYmVsXCI+TElWRSBBUEkgwrcgREVNTyBEQVRBIENMRUFSTFkgTEFCRUxMRUQ8L3NwYW4+XG4gICAgICA8L2Rpdj5cbiAgICAgIDxzZWN0aW9uIGNsYXNzTmFtZT1cInBhbmVsLWNhcmRcIiBzdHlsZT17eyBwYWRkaW5nOiAnMS4yNXJlbScsIG1heFdpZHRoOiA5MjAgfX0+XG4gICAgICAgIDxmb3JtIG9uU3VibWl0PXtjaGVja30gc3R5bGU9e3sgZGlzcGxheTogJ2dyaWQnLCBncmlkVGVtcGxhdGVDb2x1bW5zOiAnMS4yZnIgMWZyIC43ZnIgLjdmciBhdXRvJywgZ2FwOiAnLjc1cmVtJywgYWxpZ25JdGVtczogJ2VuZCcgfX0+XG4gICAgICAgICAgPGxhYmVsIGNsYXNzTmFtZT1cImZvcm0tbGFiZWxcIj5EZXN0aW5hdGlvbjxpbnB1dCBjbGFzc05hbWU9XCJmb3JtLWlucHV0XCIgdmFsdWU9e2Rlc3RpbmF0aW9ufSBvbkNoYW5nZT17KGUpID0+IHNldERlc3RpbmF0aW9uKGUudGFyZ2V0LnZhbHVlKX0gcGxhY2Vob2xkZXI9XCJab25lIG9yIHJlZ2lvblwiIHJlcXVpcmVkIC8+PC9sYWJlbD5cbiAgICAgICAgICA8bGFiZWwgY2xhc3NOYW1lPVwiZm9ybS1sYWJlbFwiPkN1cnJlbnQgbG9jYXRpb24gKG9wdGlvbmFsKTxpbnB1dCBjbGFzc05hbWU9XCJmb3JtLWlucHV0XCIgdmFsdWU9e2N1cnJlbnRMb2NhdGlvbn0gb25DaGFuZ2U9eyhlKSA9PiBzZXRDdXJyZW50TG9jYXRpb24oZS50YXJnZXQudmFsdWUpfSBwbGFjZWhvbGRlcj1cIkZvciByb3V0ZSBjb250ZXh0XCIgLz48L2xhYmVsPlxuICAgICAgICAgIDxsYWJlbCBjbGFzc05hbWU9XCJmb3JtLWxhYmVsXCI+TGF0aXR1ZGU8aW5wdXQgY2xhc3NOYW1lPVwiZm9ybS1pbnB1dFwiIHZhbHVlPXtsYXRpdHVkZX0gb25DaGFuZ2U9eyhlKSA9PiBzZXRMYXRpdHVkZShlLnRhcmdldC52YWx1ZSl9IHBsYWNlaG9sZGVyPVwiMTguNTY1MTdcIiBpbnB1dE1vZGU9XCJkZWNpbWFsXCIgLz48L2xhYmVsPlxuICAgICAgICAgIDxsYWJlbCBjbGFzc05hbWU9XCJmb3JtLWxhYmVsXCI+TG9uZ2l0dWRlPGlucHV0IGNsYXNzTmFtZT1cImZvcm0taW5wdXRcIiB2YWx1ZT17bG9uZ2l0dWRlfSBvbkNoYW5nZT17KGUpID0+IHNldExvbmdpdHVkZShlLnRhcmdldC52YWx1ZSl9IHBsYWNlaG9sZGVyPVwiODQuMTk1ODdcIiBpbnB1dE1vZGU9XCJkZWNpbWFsXCIgLz48L2xhYmVsPlxuICAgICAgICAgIDxidXR0b24gY2xhc3NOYW1lPVwiYnRuIGJ0bi1wcmltYXJ5XCIgdHlwZT1cInN1Ym1pdFwiIGRpc2FibGVkPXtsb2FkaW5nfT48UmVmcmVzaEN3IHNpemU9ezE1fSBjbGFzc05hbWU9e2xvYWRpbmcgPyAnc3BpbicgOiAnJ30gLz4gQ2hlY2sgc2FmZXR5PC9idXR0b24+XG4gICAgICAgIDwvZm9ybT5cbiAgICAgICAge2Vycm9yICYmIDxwIHN0eWxlPXt7IGNvbG9yOiAnI2I5MWMxYycsIG1hcmdpblRvcDogJzFyZW0nIH19PjxBbGVydFRyaWFuZ2xlIHNpemU9ezE1fSBzdHlsZT17eyB2ZXJ0aWNhbEFsaWduOiAnbWlkZGxlJyB9fSAvPiB7ZXJyb3J9PC9wPn1cbiAgICAgIDwvc2VjdGlvbj5cbiAgICAgIHtyZXN1bHQgJiYgKFxuICAgICAgICA8c2VjdGlvbiBjbGFzc05hbWU9XCJwYW5lbC1jYXJkXCIgc3R5bGU9e3sgcGFkZGluZzogJzEuMjVyZW0nLCBtYXhXaWR0aDogOTIwLCBtYXJnaW5Ub3A6ICcxcmVtJyB9fT5cbiAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICdmbGV4JywganVzdGlmeUNvbnRlbnQ6ICdzcGFjZS1iZXR3ZWVuJywgZ2FwOiAnMXJlbScsIGZsZXhXcmFwOiAnd3JhcCcsIGFsaWduSXRlbXM6ICdjZW50ZXInIH19PlxuICAgICAgICAgICAgPGRpdj48ZGl2IGNsYXNzTmFtZT1cInBhbmVsLXRpdGxlXCI+PENvbXBhc3Mgc2l6ZT17MTh9IC8+IHtyZXN1bHQuZGVzdGluYXRpb259PC9kaXY+PHNtYWxsPkxhc3QgdXBkYXRlZCB7bmV3IERhdGUocmVzdWx0Lmxhc3RfdXBkYXRlZCkudG9Mb2NhbGVTdHJpbmcoKX0gwrcge3Jlc3VsdC5kYXRhX3N0YXR1cyB8fCAnVU5LTk9XTid9IMK3IHsocmVzdWx0LmRhdGFfc291cmNlcyB8fCBbXSkuam9pbignLCAnKSB8fCAnTm8gcHJvdmlkZXIgc291cmNlJ308L3NtYWxsPjwvZGl2PlxuICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBjb2xvcjogcmlza0NvbG9yLCBmb250V2VpZ2h0OiA4MDAsIGxldHRlclNwYWNpbmc6ICcuMDVlbScgfX0+PFNoaWVsZEFsZXJ0IHNpemU9ezE4fSBzdHlsZT17eyB2ZXJ0aWNhbEFsaWduOiAnbWlkZGxlJyB9fSAvPiB7cmVzdWx0LnJlY29tbWVuZGF0aW9ufTwvZGl2PlxuICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwic3RhdHMtZ3JpZFwiIHN0eWxlPXt7IG1hcmdpblRvcDogJzFyZW0nIH19PlxuICAgICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJzdGF0LWNhcmRcIj48c3Bhbj5SaXNrIHNjb3JlPC9zcGFuPjxzdHJvbmc+e01hdGgucm91bmQocmVzdWx0LnJpc2tfc2NvcmUpfSAvIDEwMDwvc3Ryb25nPjxzbWFsbD57cmVzdWx0LnJpc2tfbGV2ZWx9PC9zbWFsbD48L2Rpdj5cbiAgICAgICAgICAgIDxkaXYgY2xhc3NOYW1lPVwic3RhdC1jYXJkXCI+PHNwYW4+Um91dGUgc3RhdHVzPC9zcGFuPjxzdHJvbmc+e3Jlc3VsdC5yb3V0ZV9zdGF0dXN9PC9zdHJvbmc+PC9kaXY+XG4gICAgICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cInN0YXQtY2FyZFwiPjxzcGFuPkFjdGl2ZSBhbGVydHM8L3NwYW4+PHN0cm9uZz57cmVzdWx0LmFjdGl2ZV9hbGVydHMubGVuZ3RofTwvc3Ryb25nPjwvZGl2PlxuICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogJ2dyaWQnLCBncmlkVGVtcGxhdGVDb2x1bW5zOiAnMWZyIDFmcicsIGdhcDogJzFyZW0nLCBtYXJnaW5Ub3A6ICcxcmVtJyB9fT5cbiAgICAgICAgICAgIDxkaXY+PGgzPldoeT88L2gzPjx1bD57cmVzdWx0LnJlYXNvbnMubWFwKChyZWFzb24pID0+IDxsaSBrZXk9e3JlYXNvbn0+e3JlYXNvbn08L2xpPil9PC91bD48L2Rpdj5cbiAgICAgICAgICAgIDxkaXY+PGgzPkhhemFyZHMgJiBjb25kaXRpb25zPC9oMz48cD57cmVzdWx0LmhhemFyZHMubGVuZ3RoID8gcmVzdWx0LmhhemFyZHMuam9pbignIMK3ICcpIDogJ05vIHNwZWNpZmljIGhhemFyZCBzaWduYWwgcmV0dXJuZWQuJ308L3A+PHAgc3R5bGU9e3sgbWFyZ2luVG9wOiAnLjVyZW0nIH19PntyZXN1bHQud2VhdGhlcl9zdW1tYXJ5fTwvcD57cmVzdWx0LnJlY29tbWVuZGF0aW9uID09PSAnU0FGRScgPyA8cD48Q2hlY2tDaXJjbGUyIHNpemU9ezE1fSAvPiBDb250aW51ZSB0byBtb25pdG9yIHVwZGF0ZXMuPC9wPiA6IDxwIHN0eWxlPXt7IGNvbG9yOiAnI2I5MWMxYycgfX0+PEFsZXJ0VHJpYW5nbGUgc2l6ZT17MTV9IC8+IENvbmRpdGlvbnMgY2FuIGNoYW5nZTsgZm9sbG93IHZlcmlmaWVkIGxvY2FsIGd1aWRhbmNlLjwvcD59PC9kaXY+XG4gICAgICAgICAgPC9kaXY+XG4gICAgICAgIDwvc2VjdGlvbj5cbiAgICAgICl9XG4gICAgPC9kaXY+XG4gICk7XG59O1xuIl0sImZpbGUiOiJDOi9Vc2Vycy9yYWp1Yi9Eb3dubG9hZHMvZ2VuYWkvQUlUQU0vZnJvbnRlbmQvc3JjL3BhZ2VzL1RyYXZlbFNhZmV0eVBhZ2UudHN4In0=

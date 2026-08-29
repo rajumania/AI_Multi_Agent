@@ -17,7 +17,7 @@ import { AuthUser } from './roles';
 //   * Bootstrap: on load, if a token exists in localStorage, VALIDATE it against
 //     the backend (`GET /api/v1/auth/me`). The server-verified principal — not
 //     the cached cf_user blob — is the source of truth for role/department.
-//   * Login helpers for the three real backend auth flows (operator, citizen,
+//   * Login helpers for the existing community and department auth flows
 //     department) + citizen self-registration. Each authenticates against the
 //     EXISTING backend APIs — there is no fake frontend-only auth.
 //   * Logout: clears token + cached user.
@@ -34,7 +34,7 @@ interface AuthContextValue {
   loading: boolean;
   /** Set when a previously-valid session was rejected (expired/invalid token). */
   sessionExpired: boolean;
-  loginOperator: (username: string, password: string) => Promise<AuthUser>;
+  loginAdmin: (username: string, password: string) => Promise<AuthUser>;
   loginCitizen: (email: string, phone: string) => Promise<AuthUser>;
   registerCitizen: (email: string, phone: string, fullName?: string) => Promise<AuthUser>;
   loginDepartment: (email: string, password: string, department: string) => Promise<AuthUser>;
@@ -131,17 +131,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyUser, clearSession],
   );
 
-  const loginOperator = useCallback(
-    async (username: string, password: string) => {
-      const data = await api.login(username, password);
+  const loginCitizen = useCallback(
+    async (email: string, phone: string) => {
+      const data = await api.userLogin(email, phone);
       return establishSession(data?.user);
     },
     [establishSession],
   );
 
-  const loginCitizen = useCallback(
-    async (email: string, phone: string) => {
-      const data = await api.userLogin(email, phone);
+  const loginAdmin = useCallback(
+    async (username: string, password: string) => {
+      const data = await api.login(username, password);
       return establishSession(data?.user);
     },
     [establishSession],
@@ -219,7 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       loading,
       sessionExpired,
-      loginOperator,
+      loginAdmin,
       loginCitizen,
       registerCitizen,
       loginDepartment,
@@ -232,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       loading,
       sessionExpired,
-      loginOperator,
+      loginAdmin,
       loginCitizen,
       registerCitizen,
       loginDepartment,

@@ -1,234 +1,102 @@
-import React, { FormEvent, useState } from 'react';
-import {
-  AlertCircle,
-  Building2,
-  CheckCircle2,
-  KeyRound,
-  LockKeyhole,
-  Mail,
-  ShieldCheck,
-  UserPlus,
-} from 'lucide-react';
-
-import {
-  DEPARTMENTS,
-  DEPARTMENT_LABELS,
-  DepartmentCode,
-  ROLE_DEPARTMENT,
-  ROLE_DEPARTMENT_HEAD,
-} from '../auth/roles';
-import { api, DepartmentRegistrationPayload } from '../services/api';
+import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Building2, CheckCircle2, KeyRound, LockKeyhole, Mail, Pencil, RefreshCw, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import { DEPARTMENTS, DEPARTMENT_LABELS, DepartmentCode, ROLE_DEPARTMENT, ROLE_DEPARTMENT_HEAD } from '../auth/roles';
+import { api, OrganizationDepartment, OrganizationDepartmentAccount, OrganizationUser } from '../services/api';
 
 export const DEPARTMENT_ACCOUNT_ROLES = [
   { value: ROLE_DEPARTMENT, label: 'Department Staff' },
   { value: ROLE_DEPARTMENT_HEAD, label: 'Department Head' },
 ] as const;
 
-export interface DepartmentAccountFormValues {
-  fullName: string;
-  email: string;
-  department: DepartmentCode;
-  role: typeof ROLE_DEPARTMENT | typeof ROLE_DEPARTMENT_HEAD;
-  password: string;
-  confirmPassword: string;
-}
-
-export interface CreatedDepartmentAccount {
-  full_name: string;
-  email: string;
-  department: string;
-  role: string;
-}
-
-export const initialDepartmentAccountForm: DepartmentAccountFormValues = {
-  fullName: '',
-  email: '',
-  department: DEPARTMENTS[0],
-  role: ROLE_DEPARTMENT,
-  password: '',
-  confirmPassword: '',
-};
+export interface DepartmentAccountFormValues { fullName: string; email: string; department: string; role: typeof ROLE_DEPARTMENT | typeof ROLE_DEPARTMENT_HEAD; password: string; confirmPassword: string; }
+export interface CreatedDepartmentAccount { full_name: string; email: string; department: string; role: string; }
+export const initialDepartmentAccountForm: DepartmentAccountFormValues = { fullName: '', email: '', department: DEPARTMENTS[0], role: ROLE_DEPARTMENT, password: '', confirmPassword: '' };
 
 export function validateDepartmentAccountForm(values: DepartmentAccountFormValues): string | null {
   if (!values.fullName.trim()) return 'Full name is required.';
   if (!values.email.trim()) return 'Email is required.';
   if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) return 'Enter a valid email address.';
-  if (!DEPARTMENTS.includes(values.department)) return 'Select a supported department.';
+  if (!values.department.trim()) return 'Select a department.';
   if (!DEPARTMENT_ACCOUNT_ROLES.some((item) => item.value === values.role)) return 'Select a valid department role.';
   if (!values.password) return 'Password is required.';
   if (values.password !== values.confirmPassword) return 'Passwords do not match.';
   return null;
 }
 
-export function safeCreatedDepartmentAccount(
-  result: Record<string, unknown>,
-  values: DepartmentAccountFormValues,
-): CreatedDepartmentAccount {
-  return {
-    full_name: values.fullName.trim(),
-    email: String(result.email || values.email.trim()),
-    department: String(result.department || values.department),
-    role: String(result.role || values.role),
-  };
+export function safeCreatedDepartmentAccount(result: Record<string, unknown>, values: DepartmentAccountFormValues): CreatedDepartmentAccount {
+  return { full_name: values.fullName.trim(), email: String(result.email || values.email.trim()), department: String(result.department || values.department), role: String(result.role || values.role) };
 }
 
-function roleLabel(role: string): string {
-  return DEPARTMENT_ACCOUNT_ROLES.find((item) => item.value === role)?.label || role;
-}
+const labelFor = (code: string) => DEPARTMENT_LABELS[code as DepartmentCode] || code;
+const cardStyle: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '1rem' };
 
 export const DepartmentManagementPage: React.FC = () => {
-  const [values, setValues] = useState<DepartmentAccountFormValues>(initialDepartmentAccountForm);
+  const [departments, setDepartments] = useState<OrganizationDepartment[]>([]);
+  const [accounts, setAccounts] = useState<OrganizationDepartmentAccount[]>([]);
+  const [users, setUsers] = useState<OrganizationUser[]>([]);
+  const [selectedCode, setSelectedCode] = useState('MEDICAL');
+  const [values, setValues] = useState<DepartmentAccountFormValues>({ ...initialDepartmentAccountForm, department: 'MEDICAL' });
+  const [newDepartment, setNewDepartment] = useState({ code: '', name: '', department_type: '', description: '' });
+  const [edit, setEdit] = useState({ name: '', department_type: '', description: '' });
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdAccount, setCreatedAccount] = useState<CreatedDepartmentAccount | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const selected = useMemo(() => departments.find((item) => item.code === selectedCode) || departments[0], [departments, selectedCode]);
 
-  const update = <K extends keyof DepartmentAccountFormValues>(key: K, value: DepartmentAccountFormValues[K]) => {
-    setValues((current) => ({ ...current, [key]: value }));
-    setError(null);
-    setCreatedAccount(null);
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const validationError = validateDepartmentAccountForm(values);
-    if (validationError) {
-      setError(validationError);
-      setCreatedAccount(null);
-      return;
-    }
-
-    const payload: DepartmentRegistrationPayload = {
-      email: values.email.trim().toLowerCase(),
-      password: values.password,
-      department: values.department,
-      full_name: values.fullName.trim(),
-      role: values.role,
-    };
-
-    setSubmitting(true);
-    setError(null);
-    setCreatedAccount(null);
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const result = await api.registerDepartment(payload);
-      setCreatedAccount(safeCreatedDepartmentAccount(result, values));
-      setValues(initialDepartmentAccountForm);
-    } catch (requestError: unknown) {
-      setError(requestError instanceof Error ? requestError.message : 'Department account creation failed.');
-    } finally {
-      setSubmitting(false);
-    }
+      const [overview, orgUsers] = await Promise.all([api.getOrganizationOverview(), api.getOrganizationUsers()]);
+      const rows = overview.departments || [];
+      setDepartments(rows); setUsers(orgUsers || []);
+      const next = rows.find((item) => item.code === selectedCode) || rows[0];
+      if (next) {
+        setSelectedCode(next.code);
+        setEdit({ name: next.name, department_type: next.department_type, description: next.description || '' });
+        setAccounts(await api.getOrganizationAccounts(next.code));
+      }
+      setError(null);
+    } catch (requestError: unknown) { setError(requestError instanceof Error ? requestError.message : 'Organization data could not be loaded.'); }
+    finally { setLoading(false); }
+  }, [selectedCode]);
+  useEffect(() => { void load(); }, [load]);
+
+  const selectDepartment = async (code: string) => {
+    setSelectedCode(code); setValues((current) => ({ ...current, department: code })); const row = departments.find((item) => item.code === code);
+    if (row) { setEdit({ name: row.name, department_type: row.department_type, description: row.description || '' }); try { setAccounts(await api.getOrganizationAccounts(code)); } catch (requestError: unknown) { setError(requestError instanceof Error ? requestError.message : 'Account list failed.'); } }
   };
+  const submitAccount = async (event: FormEvent) => {
+    event.preventDefault(); const validationError = validateDepartmentAccountForm(values); if (validationError) { setError(validationError); return; }
+    setSubmitting(true); setError(null); setNotice(null);
+    try { await api.createOrganizationAccount(selectedCode, { email: values.email.trim().toLowerCase(), password: values.password, full_name: values.fullName.trim(), role: values.role }); setNotice(`Account created in ${labelFor(selectedCode)}. The password is not retained or displayed by AITAM.`); setValues({ ...initialDepartmentAccountForm, department: values.department }); setAccounts(await api.getOrganizationAccounts(selectedCode)); await load(); }
+    catch (requestError: unknown) { setError(requestError instanceof Error ? requestError.message : 'Account creation failed.'); }
+    finally { setSubmitting(false); }
+  };
+  const submitDepartment = async (event: FormEvent) => {
+    event.preventDefault(); setSubmitting(true); setError(null); setNotice(null);
+    try { await api.createOrganizationDepartment(newDepartment); setNewDepartment({ code: '', name: '', department_type: '', description: '' }); setNotice('Department created in the authoritative AITAM organization registry.'); await load(); }
+    catch (requestError: unknown) { setError(requestError instanceof Error ? requestError.message : 'Department creation failed.'); }
+    finally { setSubmitting(false); }
+  };
+  const saveDepartment = async () => { if (!selected) return; setSubmitting(true); setError(null); try { await api.updateOrganizationDepartment(selected.code, edit); setNotice('Department profile updated.'); await load(); } catch (requestError: unknown) { setError(requestError instanceof Error ? requestError.message : 'Department update failed.'); } finally { setSubmitting(false); } };
+  const toggleDepartment = async () => { if (!selected) return; try { await api.updateOrganizationDepartment(selected.code, { status: selected.status === 'active' ? 'inactive' : 'active' }); setNotice(`Department ${selected.status === 'active' ? 'deactivated' : 'activated'}.`); await load(); } catch (requestError: unknown) { setError(requestError instanceof Error ? requestError.message : 'Department status update failed.'); } };
+  const updateAccount = async (account: OrganizationDepartmentAccount, payload: { status?: 'active' | 'suspended'; password?: string }) => { try { await api.updateOrganizationAccount(account.id, payload); setNotice(`Account ${account.email} updated.`); setAccounts(await api.getOrganizationAccounts(selectedCode)); } catch (requestError: unknown) { setError(requestError instanceof Error ? requestError.message : 'Account update failed.'); } };
+  const resetAccount = (account: OrganizationDepartmentAccount) => { const password = window.prompt(`Set a new password for ${account.email}. It will not be shown again.`); if (password) void updateAccount(account, { password }); };
 
-  return (
-    <div className="app-content">
-      <div className="dashboard-title-row">
-        <div>
-          <h2>Department Management</h2>
-          <p>Manage specialized emergency response department accounts.</p>
-        </div>
-        <div className="panel-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-          <ShieldCheck size={14} /> Privileged Access
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)', gap: '1.25rem', alignItems: 'start' }}>
-        <section className="panel-card" aria-labelledby="create-department-account-heading">
-          <div className="panel-header">
-            <div className="panel-title" id="create-department-account-heading">
-              <UserPlus size={18} color="#0284c7" />
-              Create Department Account
-            </div>
-            <span className="panel-tag">Admin / Operator</span>
-          </div>
-
-          <form className="panel-body" onSubmit={handleSubmit} noValidate>
-            {error && (
-              <div role="alert" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', padding: '0.75rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)', color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', fontSize: '0.8125rem' }}>
-                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '0.05rem' }} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {createdAccount && (
-              <div role="status" style={{ padding: '0.85rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)', color: '#166534', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.55rem' }}>
-                  <CheckCircle2 size={16} /> Department account created successfully.
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.35rem 1rem', fontSize: '0.78rem' }}>
-                  <span><strong>Name:</strong> {createdAccount.full_name}</span>
-                  <span><strong>Email:</strong> {createdAccount.email}</span>
-                  <span><strong>Department:</strong> {DEPARTMENT_LABELS[createdAccount.department as DepartmentCode] || createdAccount.department}</span>
-                  <span><strong>Role:</strong> {roleLabel(createdAccount.role)}</span>
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-              <label>
-                <span className="form-label"><UserPlus size={14} /> Full Name</span>
-                <input className="form-input" type="text" autoComplete="name" value={values.fullName} onChange={(event) => update('fullName', event.target.value)} placeholder="e.g. Dr. K. S. Rao" />
-              </label>
-              <label>
-                <span className="form-label"><Mail size={14} /> Email</span>
-                <input className="form-input" type="email" autoComplete="email" value={values.email} onChange={(event) => update('email', event.target.value)} placeholder="department-admin@vignan.ac.in" />
-              </label>
-            </div>
-
-            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1.1rem', marginBottom: '1.25rem' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Department Assignment</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                <label>
-                  <span className="form-label"><Building2 size={14} /> Department</span>
-                  <select className="form-select" value={values.department} onChange={(event) => update('department', event.target.value as DepartmentCode)}>
-                    {DEPARTMENTS.map((department) => <option key={department} value={department}>{DEPARTMENT_LABELS[department]} ({department})</option>)}
-                  </select>
-                </label>
-                <label>
-                  <span className="form-label"><ShieldCheck size={14} /> Role</span>
-                  <select className="form-select" value={values.role} onChange={(event) => update('role', event.target.value as DepartmentAccountFormValues['role'])}>
-                    {DEPARTMENT_ACCOUNT_ROLES.map((role) => <option key={role.value} value={role.value}>{role.label} ({role.value})</option>)}
-                  </select>
-                </label>
-              </div>
-            </div>
-
-            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1.1rem' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>Security</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                <label>
-                  <span className="form-label"><LockKeyhole size={14} /> Password</span>
-                  <input className="form-input" type="password" autoComplete="new-password" value={values.password} onChange={(event) => update('password', event.target.value)} placeholder="Set an account password" />
-                </label>
-                <label>
-                  <span className="form-label"><KeyRound size={14} /> Confirm Password</span>
-                  <input className="form-input" type="password" autoComplete="new-password" value={values.confirmPassword} onChange={(event) => update('confirmPassword', event.target.value)} placeholder="Re-enter the password" />
-                </label>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.35rem' }}>
-              <button className="btn btn-primary" type="submit" disabled={submitting}>
-                <UserPlus size={16} />
-                {submitting ? 'Creating Account...' : 'Create Department Account'}
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <aside className="panel-card">
-          <div className="panel-header">
-            <div className="panel-title"><ShieldCheck size={18} color="#0d9488" /> Account Provisioning</div>
-          </div>
-          <div className="panel-body" style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            <p style={{ marginTop: 0 }}>New accounts are created by the backend and assigned permanently to the selected department.</p>
-            <p>The department user signs in from the existing Department Login flow. This screen does not display or retain the account password.</p>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.45rem', padding: '0.65rem', borderRadius: 'var(--radius-md)', background: '#f8fafc', border: '1px solid var(--border-subtle)', fontSize: '0.75rem' }}>
-              <ShieldCheck size={15} color="#0284c7" style={{ flexShrink: 0, marginTop: '0.1rem' }} />
-              <span>Department account listing is not shown because the existing backend exposes creation and login, but no safe account-list endpoint.</span>
-            </div>
-          </div>
-        </aside>
+  return <div className="app-content">
+    <div className="dashboard-title-row"><div><h2>AITAM Organization Administration</h2><p>Authoritative department registry, staff access, operational scope, and status.</p></div><div className="panel-tag"><ShieldCheck size={14} /> ADMIN-ONLY CONTROL</div></div>
+    {error && <div role="alert" className="alert-banner error"><AlertCircle size={16} /> {error}</div>}{notice && <div role="status" className="alert-banner success"><CheckCircle2 size={16} /> {notice}</div>}
+    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: '.75rem', marginBottom: '1rem' }}><div style={cardStyle}><small>ORGANIZATION</small><strong style={{ display: 'block', marginTop: '.3rem' }}>AITAM</strong><span>Active registry</span></div><div style={cardStyle}><small>DEPARTMENTS</small><strong style={{ display: 'block', marginTop: '.3rem' }}>{departments.length}</strong><span>{departments.filter((item) => item.status === 'active').length} active</span></div><div style={cardStyle}><small>STAFF ACCOUNTS</small><strong style={{ display: 'block', marginTop: '.3rem' }}>{departments.reduce((sum, item) => sum + item.account_count, 0)}</strong><span>Backend identities</span></div><div style={cardStyle}><small>LIVE OPERATIONS</small><strong style={{ display: 'block', marginTop: '.3rem' }}>{departments.reduce((sum, item) => sum + item.active_incidents, 0)}</strong><span>Routed active incidents</span></div></section>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px,.9fr) minmax(0,2fr)', gap: '1rem', alignItems: 'start' }}>
+      <section style={cardStyle}><div className="panel-header"><div className="panel-title"><Building2 size={18} color="#0284c7" /> Departments</div><button className="btn btn-sm btn-outline" onClick={() => void load()}><RefreshCw size={14} /></button></div>{loading ? <p>Loading registry…</p> : departments.map((item) => <button key={item.code} type="button" onClick={() => void selectDepartment(item.code)} style={{ width: '100%', textAlign: 'left', padding: '.75rem', marginTop: '.45rem', borderRadius: 9, border: `1px solid ${selectedCode === item.code ? '#0284c7' : '#e2e8f0'}`, background: selectedCode === item.code ? '#eff6ff' : '#fff', cursor: 'pointer' }}><strong>{item.name}</strong><span style={{ display: 'block', fontSize: '.68rem', color: '#64748b', marginTop: '.2rem' }}>{item.code} · {item.account_count} accounts · {item.active_incidents} active</span><span style={{ color: item.status === 'active' ? '#15803d' : '#b91c1c', fontSize: '.65rem', fontWeight: 800 }}>{item.status.toUpperCase()}</span></button>)}<form onSubmit={submitDepartment} style={{ borderTop: '1px solid #e2e8f0', marginTop: '1rem', paddingTop: '1rem' }}><strong style={{ fontSize: '.8rem' }}>Create department</strong><input className="form-input" style={{ marginTop: '.5rem' }} placeholder="Code e.g. WELFARE" value={newDepartment.code} onChange={(e) => setNewDepartment({ ...newDepartment, code: e.target.value })} required /><input className="form-input" style={{ marginTop: '.45rem' }} placeholder="Department name" value={newDepartment.name} onChange={(e) => setNewDepartment({ ...newDepartment, name: e.target.value })} required /><input className="form-input" style={{ marginTop: '.45rem' }} placeholder="Type" value={newDepartment.department_type} onChange={(e) => setNewDepartment({ ...newDepartment, department_type: e.target.value })} required /><button className="btn btn-primary" style={{ marginTop: '.55rem', width: '100%' }} disabled={submitting}><Building2 size={14} /> Create department</button></form></section>
+      <div style={{ display: 'grid', gap: '1rem' }}>
+        {selected && <section style={cardStyle}><div className="panel-header"><div><div className="panel-title"><Pencil size={17} color="#0284c7" /> {selected.name}</div><small>{selected.code} · {selected.department_type} · {selected.resource_count} scoped resources</small></div><button className="btn btn-sm btn-outline" onClick={() => void toggleDepartment()}>{selected.status === 'active' ? 'Deactivate' : 'Activate'}</button></div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '.6rem' }}><input className="form-input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /><input className="form-input" value={edit.department_type} onChange={(e) => setEdit({ ...edit, department_type: e.target.value })} /><input className="form-input" value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} placeholder="Scope description" /></div><button className="btn btn-outline" style={{ marginTop: '.65rem' }} onClick={() => void saveDepartment()} disabled={submitting}>Save department profile</button></section>}
+        <section style={cardStyle}><div className="panel-header"><div className="panel-title"><UserPlus size={18} color="#0284c7" /> Provision staff account</div><span className="panel-tag">HASHED SERVER-SIDE</span></div><form onSubmit={submitAccount}><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '.65rem' }}><label><span className="form-label"><Users size={13} /> Full name</span><input className="form-input" value={values.fullName} onChange={(e) => setValues({ ...values, fullName: e.target.value })} required /></label><label><span className="form-label"><Mail size={13} /> Email</span><input className="form-input" type="email" value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} required /></label><label><span className="form-label"><Building2 size={13} /> Department</span><select className="form-select" value={selectedCode} onChange={(e) => void selectDepartment(e.target.value)}>{departments.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label><label><span className="form-label"><ShieldCheck size={13} /> Role</span><select className="form-select" value={values.role} onChange={(e) => setValues({ ...values, role: e.target.value as DepartmentAccountFormValues['role'] })}><option value={ROLE_DEPARTMENT}>Staff</option><option value={ROLE_DEPARTMENT_HEAD}>Head</option></select></label><label><span className="form-label"><LockKeyhole size={13} /> Password</span><input className="form-input" type="password" value={values.password} onChange={(e) => setValues({ ...values, password: e.target.value })} required /></label><label><span className="form-label"><KeyRound size={13} /> Confirm password</span><input className="form-input" type="password" value={values.confirmPassword} onChange={(e) => setValues({ ...values, confirmPassword: e.target.value })} required /></label></div><button className="btn btn-primary" style={{ marginTop: '.8rem' }} disabled={submitting}><UserPlus size={15} /> Create scoped account</button></form></section>
+        <section style={cardStyle}><div className="panel-header"><div className="panel-title"><Users size={18} color="#0d9488" /> {labelFor(selectedCode)} accounts</div><span className="panel-tag">{accounts.length} RECORDS</span></div>{accounts.length === 0 ? <p>No staff account is assigned to this department.</p> : <div style={{ display: 'grid', gap: '.45rem' }}>{accounts.map((account) => <div key={account.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.6rem', flexWrap: 'wrap', padding: '.65rem', border: '1px solid #e2e8f0', borderRadius: 8 }}><div><strong>{account.full_name || account.email}</strong><small style={{ display: 'block', color: '#64748b' }}>{account.email} · {account.role} · <span style={{ color: account.status === 'active' ? '#15803d' : '#b91c1c' }}>{account.status}</span></small></div><div style={{ display: 'flex', gap: '.35rem' }}><button className="btn btn-sm btn-outline" onClick={() => void updateAccount(account, { status: account.status === 'active' ? 'suspended' : 'active' })}>{account.status === 'active' ? 'Deactivate' : 'Activate'}</button><button className="btn btn-sm btn-outline" onClick={() => resetAccount(account)}>Reset password</button></div></div>)}</div>}</section>
+        <section style={cardStyle}><div className="panel-header"><div className="panel-title"><Users size={18} color="#7c3aed" /> User department assignment</div><span className="panel-tag">AUTHORITY CONTROL</span></div><div style={{ display: 'grid', gap: '.45rem' }}>{users.filter((user) => user.role !== 'user').map((user) => <div key={user.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap', fontSize: '.78rem' }}><span><strong>{user.full_name || user.username}</strong><small style={{ display: 'block', color: '#64748b' }}>{user.username} · {user.role}</small></span><select className="form-select" style={{ width: 220 }} value={user.department || ''} onChange={(e) => api.assignOrganizationUser(user.id, e.target.value || null).then(() => load()).catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'User assignment failed.'))}><option value="">No department</option>{departments.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></div>)}</div></section>
       </div>
     </div>
-  );
+    <p style={{ marginTop: '1rem', color: '#64748b', fontSize: '.72rem' }}>All management actions are persisted in campusflow.db and protected by the existing privileged authentication guard. Passwords and hashes never enter the response payload.</p>
+  </div>;
 };

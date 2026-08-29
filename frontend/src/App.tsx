@@ -9,6 +9,7 @@ import { ResourcesPage } from './pages/ResourcesPage';
 import { ResponsesPage } from './pages/ResponsesPage';
 import { ActivityPage } from './pages/ActivityPage';
 import { DepartmentManagementPage } from './pages/DepartmentManagementPage';
+import { OperationalDataPage } from './pages/OperationalDataPage';
 import { api, appendWsToken } from './services/api';
 import { useAuth } from './auth/AuthContext';
 import { canAccessDepartmentManagement, displayName, roleDisplayName } from './auth/roles';
@@ -29,6 +30,10 @@ import {
   reduceRealtime,
 } from './realtime/workflowReducer';
 import { CommandCenter3DLazy } from './command3d/CommandCenter3DLazy';
+import { RiskPanel } from './components/RiskPanel';
+import { DisasterRiskMap } from './components/DisasterRiskMap';
+import { TravelSafetyPage } from './pages/TravelSafetyPage';
+import { OfflineStatus } from './components/OfflineStatus';
 
 const upsertIncident = (items: Incident[], incident: Incident) => {
   const previous = items.find((item) => item.incident_id === incident.incident_id);
@@ -76,6 +81,7 @@ export const App: React.FC<{ initialTab?: string }> = ({ initialTab = 'overview'
   const [voiceIncident, setVoiceIncident] = useState<Incident | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [notificationRefreshKey, setNotificationRefreshKey] = useState(0);
+  const [riskRefreshKey, setRiskRefreshKey] = useState(0);
   const voiceController = useRef<VoiceAlertController | null>(null);
   // Ref that mirrors commandIncidentId so the stable WS effect (dep: [addTimelineEvent])
   // can always read the current active incident without a stale closure.
@@ -172,6 +178,8 @@ export const App: React.FC<{ initialTab?: string }> = ({ initialTab = 'overview'
       socket.onopen = () => {
         reconnectDelay = 1000;
         setWsState('CONNECTED');
+        // Reconcile durable notifications after every reconnect.
+        setNotificationRefreshKey((value) => value + 1);
         socket?.send('operator-dashboard');
       };
       socket.onerror = () => setWsState('OFFLINE');
@@ -189,8 +197,16 @@ export const App: React.FC<{ initialTab?: string }> = ({ initialTab = 'overview'
           // stable; the reducer ignores non-workflow events). This is what drives
           // the 3D command center from real backend state.
           dispatchRealtime(event);
-          if (event.event_name === 'notification_created') {
+          if (['notification_created', 'notification_delivered', 'notification_read', 'notification_failed'].includes(event.event_name)) {
             setNotificationRefreshKey((value) => value + 1);
+          }
+          if (event.event_name === 'notification_created') {
+            if (event.notification_id && socket?.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({ type: 'notification_delivered', notification_id: event.notification_id }));
+            }
+          }
+          if (['risk_updated', 'early_warning_created', 'weather_updated', 'environment_updated'].includes(event.event_name)) {
+            setRiskRefreshKey((value) => value + 1);
           }
           if (event.event_name === 'in_app_alert_available') setInAppAlertVisible(true);
           if (event.event_name === 'incident_resolved' || event.event_name === 'incident_closed') {
@@ -271,7 +287,14 @@ export const App: React.FC<{ initialTab?: string }> = ({ initialTab = 'overview'
               updated_at: event.updated_at || event.timestamp,
             } as Incident);
           }
-          if (event.incident_id && event.incident_id !== 'system' && event.incident_id !== 'live_telemetry') {
+          // Risk lifecycle events use a `risk:<prediction-id>` correlation key,
+          // not an incident primary key. Do not turn those into avoidable 404s.
+          if (
+            event.incident_id
+            && event.incident_id !== 'system'
+            && event.incident_id !== 'live_telemetry'
+            && !event.incident_id.startsWith('risk:')
+          ) {
             api.getIncidentById(event.incident_id).then((updated) => {
               setIncidents((previous) => upsertIncident(previous, updated));
               // The existing backend WebSocket event is the trigger. Fetching the
@@ -359,7 +382,7 @@ export const App: React.FC<{ initialTab?: string }> = ({ initialTab = 'overview'
   const handleResolveIncident = async (incident: Incident) => {
     try {
       setWorkflowStatus('RESOLVING INCIDENT');
-      const resolved = await api.resolveIncident(incident.incident_id, 'Situation confirmed under control by the campus operator.');
+      const resolved = await api.resolveIncident(incident.incident_id, 'Situation confirmed under control by the response commander.');
       setIncidents((previous) => upsertIncident(previous, resolved));
       setInAppAlertVisible(false);
       setWorkflowStatus('STANDING BY');
@@ -373,6 +396,7 @@ export const App: React.FC<{ initialTab?: string }> = ({ initialTab = 'overview'
 
   return (
     <div className="app-container" style={{ position: 'relative' }}>
+      <OfflineStatus />
       <Header health={health} loading={loading} onRefresh={fetchTelemetry} wsState={wsState} user={headerUser} onLogout={handleLogout} notificationRefreshKey={notificationRefreshKey} onOpenMenu={() => setMobileNavOpen(true)} />
       <div className="main-body">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} showDepartmentManagement={canAccessDepartmentManagement(authUser)} />
@@ -407,16 +431,25 @@ export const App: React.FC<{ initialTab?: string }> = ({ initialTab = 'overview'
               onGpsLocation={setOperatorLocation}
               onResolveIncident={handleResolveIncident}
               onViewResponsePlan={() => setActiveTab('responses')}
+              riskRefreshKey={riskRefreshKey}
             />
           )}
+          {activeTab === 'risk' && <div className="app-content"><div className="dashboard-title-row"><div><h2>Risk & Early Warning</h2><p>Evidence-based disaster risk estimation for communities and response teams.</p></div></div><RiskPanel refreshKey={riskRefreshKey} /></div>}
+          {activeTab === 'travel-safety' && <TravelSafetyPage />}
+          {activeTab === 'map' && <div className="app-content"><div className="dashboard-title-row"><div><h2>Disaster Risk Map</h2><p>Interactive backend-driven risk, vulnerability, sensor, incident, resource, route and alert command view.</p></div></div><DisasterRiskMap incidents={incidents} onSelectIncident={handleSelectIncident} activeIncidentId={activeIncident?.incident_id} liveEvents={timeline} operatorLocation={operatorLocation} /></div>}
           {activeTab === 'incidents' && <IncidentsPage incidents={incidents} loading={loading} onOpenReportModal={() => setIsReportModalOpen(true)} onRefresh={fetchTelemetry} liveEvents={timeline} />}
           {activeTab === 'resources' && <ResourcesPage />}
+          {activeTab === 'sensors' && <OperationalDataPage view="sensors" liveEvents={timeline} />}
+          {activeTab === 'rescue-requests' && <OperationalDataPage view="rescue" liveEvents={timeline} />}
+          {activeTab === 'shelters-hospitals' && <OperationalDataPage view="shelters" liveEvents={timeline} />}
           {activeTab === 'responses' && <ResponsesPage />}
+          {activeTab === 'alerts' && <OperationalDataPage view="alerts" liveEvents={timeline} />}
           {activeTab === 'activity' && <ActivityPage />}
+          {activeTab === 'monitoring' && <OperationalDataPage view="monitoring" liveEvents={timeline} />}
           {activeTab === 'department-management' && canAccessDepartmentManagement(authUser) && <DepartmentManagementPage />}
           {activeTab === 'command3d' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '1.25rem' }}>
-              <CommandCenter3DLazy incident={activeWorkflow} connected={wsState === 'CONNECTED'} />
+              <CommandCenter3DLazy incident={activeWorkflow} connected={wsState === 'CONNECTED'} liveEvents={timeline} />
             </div>
           )}
         </main>

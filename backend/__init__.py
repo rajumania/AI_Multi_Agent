@@ -1,1 +1,1 @@
-# CampusFlow AI Backend Package
+# AITAM Disaster Response AI Backend Package

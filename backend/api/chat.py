@@ -16,11 +16,11 @@ from backend.services.memory_service import memory_service
 router = APIRouter(prefix="/api/v1/chat", tags=["Personal Assistant"])
 
 
-def _require_campus_user(principal):
+def _require_community_user(principal):
     if principal.is_privileged or principal.is_department:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="The personal assistant is available from the campus member profile.",
+            detail="The personal assistant is available from the community profile.",
         )
     return str(principal.id)
 
@@ -34,7 +34,7 @@ def _history(db: Session, user_id: str, conversation_id: str):
 
 @router.get("/history", response_model=ChatHistoryResponse)
 def get_chat_history(db: Session = Depends(get_db), principal=Depends(get_current_principal)):
-    user_id = _require_campus_user(principal)
+    user_id = _require_community_user(principal)
     latest = db.query(ChatMessageDB).filter(ChatMessageDB.user_id == user_id).order_by(
         ChatMessageDB.created_at.desc(), ChatMessageDB.id.desc()
     ).first()
@@ -50,7 +50,7 @@ def get_chat_history(db: Session = Depends(get_db), principal=Depends(get_curren
 
 @router.delete("/history", status_code=status.HTTP_204_NO_CONTENT)
 def clear_chat_history(db: Session = Depends(get_db), principal=Depends(get_current_principal)):
-    user_id = _require_campus_user(principal)
+    user_id = _require_community_user(principal)
     db.query(ChatMessageDB).filter(ChatMessageDB.user_id == user_id).delete(synchronize_session=False)
     db.commit()
 
@@ -61,7 +61,7 @@ def send_chat_message(
     db: Session = Depends(get_db),
     principal=Depends(get_current_principal),
 ):
-    user_id = _require_campus_user(principal)
+    user_id = _require_community_user(principal)
     conversation_id = request.conversation_id or f"conv-{uuid4().hex[:24]}"
     # The conversation id is only a grouping key. Ownership is always enforced
     # by user_id in every query; a guessed id cannot cross the user boundary.

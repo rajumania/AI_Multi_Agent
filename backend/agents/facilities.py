@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional
 from backend.services.llm_service import llm_service
 
 
-FACILITIES_AGENT_SYSTEM_PROMPT = """You are the specialized Facilities & Maintenance Operations Agent for CAMPUSFLOW AI.
+FACILITIES_AGENT_SYSTEM_PROMPT = """You are the specialized Facilities & Maintenance Operations Agent for AITAM Disaster Response AI.
 Your duty is to assess infrastructure and chemical-exposure support hazards (electrical, plumbing, structural, HVAC, elevators, ventilation, utilities) and recommend isolation, shutdown, and repair-crew actions.
 
 CRITICAL SAFETY RULES:

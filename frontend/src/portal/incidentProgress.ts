@@ -39,7 +39,7 @@ const PHASE_LABELS: Record<(typeof PHASE_KEYS)[number], string> = {
 
 const ACTIVE_HEADLINES = [
   'Your report has been received.',
-  'The campus safety team is assessing the situation.',
+  'The community response team is assessing the situation.',
   'A response plan is being prepared.',
   'Responders are being dispatched to the location.',
 ];
@@ -95,9 +95,9 @@ export function citizenProgress(status?: string | null): CitizenProgress {
 
   let headline: string;
   if (resolved) {
-    headline = 'Resolved and verified by campus safety.';
+    headline = 'Resolved and verified by the response team.';
   } else if (onHold) {
-    headline = 'On hold — campus safety is reviewing your report.';
+    headline = 'On hold — the response team is reviewing your report.';
   } else {
     headline = ACTIVE_HEADLINES[current] || ACTIVE_HEADLINES[0];
   }

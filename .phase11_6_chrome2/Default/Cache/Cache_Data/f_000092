@@ -1,0 +1,339 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/components/NotificationBell.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=ab160a9a"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+var _s = $RefreshSig$();
+import __vite__cjsImport3_react from "/node_modules/.vite/deps/react.js?v=ab160a9a"; const useCallback = __vite__cjsImport3_react["useCallback"]; const useEffect = __vite__cjsImport3_react["useEffect"]; const useMemo = __vite__cjsImport3_react["useMemo"]; const useState = __vite__cjsImport3_react["useState"];
+import { Bell, Check, CheckCheck, X } from "/node_modules/.vite/deps/lucide-react.js?v=ab160a9a";
+import { api } from "/src/services/api.ts";
+import { recentNotifications, unreadNotificationCount } from "/src/portal/notificationPresentation.ts";
+export const NotificationBell = ({ refreshKey = 0 }) => {
+  _s();
+  const [items, setItems] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setItems(await api.getNotifications());
+      setError(null);
+    } catch (err) {
+      setError(err.message || "Unable to load notifications.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load, refreshKey]);
+  const unread = useMemo(() => unreadNotificationCount(items), [items]);
+  const markRead = async (item) => {
+    try {
+      const updated = await api.markNotificationRead(item.id);
+      setItems((previous) => previous.map((entry) => entry.id === updated.id ? updated : entry));
+    } catch (err) {
+      setError(err.message || "Unable to mark notification read.");
+    }
+  };
+  const markAllRead = async () => {
+    try {
+      const updated = await api.markAllNotificationsRead();
+      const ids = new Set(updated.map((item) => item.id));
+      setItems((previous) => previous.map((item) => ids.has(item.id) ? { ...item, read: 1 } : item));
+    } catch (err) {
+      setError(err.message || "Unable to mark notifications read.");
+    }
+  };
+  return /* @__PURE__ */ jsxDEV("div", { className: "notification-bell", style: { position: "relative" }, children: [
+    /* @__PURE__ */ jsxDEV("button", { className: "notification-bell-button", "aria-label": "Notifications", onClick: () => setOpen((value) => !value), style: { position: "relative", display: "inline-flex", padding: "0.45rem", border: "1px solid #334155", borderRadius: 7, background: "transparent", color: "#cbd5e1", cursor: "pointer" }, children: [
+      /* @__PURE__ */ jsxDEV(Bell, { size: 17 }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+        lineNumber: 67,
+        columnNumber: 9
+      }, this),
+      unread > 0 && /* @__PURE__ */ jsxDEV("span", { style: { position: "absolute", top: -5, right: -5, minWidth: 16, height: 16, padding: "0 3px", borderRadius: 999, background: "#ef4444", color: "#fff", fontSize: 10, fontWeight: 800, display: "grid", placeItems: "center" }, children: unread > 99 ? "99+" : unread }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+        lineNumber: 68,
+        columnNumber: 24
+      }, this)
+    ] }, void 0, true, {
+      fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+      lineNumber: 66,
+      columnNumber: 7
+    }, this),
+    open && /* @__PURE__ */ jsxDEV("div", { className: "notification-panel", style: { position: "absolute", zIndex: 30, top: "calc(100% + 0.55rem)", right: 0, width: 320, maxWidth: "80vw", background: "#fff", color: "#0f172a", border: "1px solid #cbd5e1", borderRadius: 10, boxShadow: "0 12px 28px rgba(15,23,42,0.25)", padding: "0.7rem" }, children: [
+      /* @__PURE__ */ jsxDEV("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.45rem" }, children: [
+        /* @__PURE__ */ jsxDEV("strong", { style: { fontSize: "0.8rem" }, children: "Notifications" }, void 0, false, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+          lineNumber: 71,
+          columnNumber: 122
+        }, this),
+        /* @__PURE__ */ jsxDEV("div", { style: { display: "flex", gap: ".35rem", alignItems: "center" }, children: [
+          unread > 0 && /* @__PURE__ */ jsxDEV("button", { "aria-label": "Mark all notifications read", onClick: () => void markAllRead(), style: { border: 0, background: "transparent", color: "#0284c7", cursor: "pointer" }, children: /* @__PURE__ */ jsxDEV(CheckCheck, { size: 14 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+            lineNumber: 71,
+            columnNumber: 438
+          }, this) }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+            lineNumber: 71,
+            columnNumber: 268
+          }, this),
+          /* @__PURE__ */ jsxDEV("button", { "aria-label": "Close notifications", onClick: () => setOpen(false), style: { border: 0, background: "transparent", color: "#64748b", cursor: "pointer" }, children: /* @__PURE__ */ jsxDEV(X, { size: 14 }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+            lineNumber: 71,
+            columnNumber: 630
+          }, this) }, void 0, false, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+            lineNumber: 71,
+            columnNumber: 472
+          }, this)
+        ] }, void 0, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+          lineNumber: 71,
+          columnNumber: 183
+        }, this)
+      ] }, void 0, true, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+        lineNumber: 71,
+        columnNumber: 9
+      }, this),
+      loading && /* @__PURE__ */ jsxDEV("div", { style: { padding: "1rem", color: "#64748b", fontSize: "0.75rem" }, children: "Loading…" }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+        lineNumber: 72,
+        columnNumber: 21
+      }, this),
+      !loading && error && /* @__PURE__ */ jsxDEV("div", { style: { padding: "0.6rem", color: "#b91c1c", background: "#fef2f2", fontSize: "0.72rem", borderRadius: 6 }, children: error }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+        lineNumber: 73,
+        columnNumber: 31
+      }, this),
+      !loading && !error && items.length === 0 && /* @__PURE__ */ jsxDEV("div", { style: { padding: "1rem", color: "#64748b", fontSize: "0.75rem" }, children: "No recent notifications." }, void 0, false, {
+        fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+        lineNumber: 74,
+        columnNumber: 54
+      }, this),
+      !loading && !error && recentNotifications(items, 20).map(
+        (item) => /* @__PURE__ */ jsxDEV("div", { style: { padding: "0.55rem 0.25rem", borderBottom: "1px solid #e2e8f0", opacity: item.read ? 0.65 : 1 }, children: [
+          /* @__PURE__ */ jsxDEV("div", { style: { display: "flex", gap: "0.5rem" }, children: [
+            /* @__PURE__ */ jsxDEV("span", { style: { alignSelf: "flex-start", marginTop: 2, padding: "2px 5px", borderRadius: 4, background: item.priority === "critical" ? "#fee2e2" : item.priority === "high" ? "#ffedd5" : "#e0f2fe", color: item.priority === "critical" ? "#b91c1c" : item.priority === "high" ? "#c2410c" : "#0369a1", fontSize: 9, fontWeight: 800 }, children: String(item.priority || item.level || "medium").toUpperCase() }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 78,
+              columnNumber: 15
+            }, this),
+            /* @__PURE__ */ jsxDEV("div", { style: { flex: 1 }, children: [
+              /* @__PURE__ */ jsxDEV("div", { style: { fontSize: "0.72rem", fontWeight: 800 }, children: item.title }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 80,
+                columnNumber: 15
+              }, this),
+              /* @__PURE__ */ jsxDEV("div", { style: { marginTop: 2, fontSize: "0.68rem", color: "#475569", lineHeight: 1.35 }, children: item.message }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 81,
+                columnNumber: 15
+              }, this),
+              /* @__PURE__ */ jsxDEV("div", { style: { marginTop: 3, fontSize: "0.6rem", color: "#64748b" }, children: [
+                item.department || "Operations",
+                item.incident_id ? ` · ${item.incident_id}` : "",
+                " · ",
+                new Date(item.created_at).toLocaleString()
+              ] }, void 0, true, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 82,
+                columnNumber: 15
+              }, this),
+              /* @__PURE__ */ jsxDEV("div", { style: { marginTop: 2, fontSize: "0.58rem", color: "#94a3b8" }, children: [
+                "Status: ",
+                item.lifecycle_status || (item.read ? "READ" : "CREATED")
+              ] }, void 0, true, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 83,
+                columnNumber: 15
+              }, this)
+            ] }, void 0, true, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 79,
+              columnNumber: 13
+            }, this),
+            !item.read && /* @__PURE__ */ jsxDEV("button", { "aria-label": `Mark ${item.title} read`, onClick: () => void markRead(item), style: { alignSelf: "center", border: 0, background: "transparent", color: "#0284c7", cursor: "pointer" }, children: /* @__PURE__ */ jsxDEV(Check, { size: 14 }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 87,
+              columnNumber: 17
+            }, this) }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 86,
+              columnNumber: 13
+            }, this),
+            /* @__PURE__ */ jsxDEV("button", { type: "button", "aria-label": `Show details for ${item.title}`, onClick: () => setExpandedId((value) => value === item.id ? null : item.id), style: { alignSelf: "flex-start", border: 0, background: "transparent", color: "#64748b", cursor: "pointer", fontSize: 11 }, children: expandedId === item.id ? "−" : "+" }, void 0, false, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 90,
+              columnNumber: 13
+            }, this)
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+            lineNumber: 77,
+            columnNumber: 13
+          }, this),
+          expandedId === item.id && item.details && /* @__PURE__ */ jsxDEV("div", { style: { margin: "0.45rem 0 0 1.4rem", padding: "0.45rem", background: "#f8fafc", borderRadius: 6, fontSize: "0.62rem", color: "#334155", lineHeight: 1.45 }, children: [
+            Boolean(item.details.location_label) && /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("strong", { children: "Location:" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 93,
+                columnNumber: 61
+              }, this),
+              " ",
+              String(item.details.location_label)
+            ] }, void 0, true, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 93,
+              columnNumber: 56
+            }, this),
+            item.details.latitude !== void 0 && item.details.longitude !== void 0 && /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("strong", { children: "Coordinates:" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 94,
+                columnNumber: 100
+              }, this),
+              " ",
+              String(item.details.latitude),
+              ", ",
+              String(item.details.longitude)
+            ] }, void 0, true, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 94,
+              columnNumber: 95
+            }, this),
+            Boolean(item.details.hazard_type) && /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("strong", { children: "Hazard:" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 95,
+                columnNumber: 58
+              }, this),
+              " ",
+              String(item.details.hazard_type)
+            ] }, void 0, true, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 95,
+              columnNumber: 53
+            }, this),
+            (item.details.risk_level || item.details.risk_score !== void 0) && /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("strong", { children: "Risk:" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 96,
+                columnNumber: 91
+              }, this),
+              " ",
+              String(item.details.risk_level || "UNKNOWN"),
+              item.details.risk_score !== void 0 ? ` (${String(item.details.risk_score)})` : ""
+            ] }, void 0, true, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 96,
+              columnNumber: 86
+            }, this),
+            Boolean(item.details.targeting_reason) && /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("strong", { children: "Why targeted:" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 97,
+                columnNumber: 63
+              }, this),
+              " ",
+              String(item.details.targeting_reason)
+            ] }, void 0, true, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 97,
+              columnNumber: 58
+            }, this),
+            Boolean(item.details.approval_status) && /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("strong", { children: "Approval:" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 98,
+                columnNumber: 62
+              }, this),
+              " ",
+              String(item.details.approval_status)
+            ] }, void 0, true, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 98,
+              columnNumber: 57
+            }, this),
+            Boolean(item.details.response_status) && /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("strong", { children: "Response:" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 99,
+                columnNumber: 62
+              }, this),
+              " ",
+              String(item.details.response_status)
+            ] }, void 0, true, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 99,
+              columnNumber: 57
+            }, this),
+            Array.isArray(item.details.evidence_summary) && item.details.evidence_summary.length > 0 && /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV("strong", { children: "Evidence:" }, void 0, false, {
+                fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+                lineNumber: 100,
+                columnNumber: 113
+              }, this),
+              " ",
+              item.details.evidence_summary.map((value) => String(value)).join("; ")
+            ] }, void 0, true, {
+              fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+              lineNumber: 100,
+              columnNumber: 108
+            }, this)
+          ] }, void 0, true, {
+            fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+            lineNumber: 92,
+            columnNumber: 56
+          }, this)
+        ] }, item.id, true, {
+          fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+          lineNumber: 76,
+          columnNumber: 9
+        }, this)
+      )
+    ] }, void 0, true, {
+      fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+      lineNumber: 70,
+      columnNumber: 16
+    }, this)
+  ] }, void 0, true, {
+    fileName: "C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx",
+    lineNumber: 65,
+    columnNumber: 5
+  }, this);
+};
+_s(NotificationBell, "ASaQuFbNjoce66kQSpMeruNCcHE=");
+_c = NotificationBell;
+var _c;
+$RefreshReg$(_c, "NotificationBell");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("C:/Users/rajub/Downloads/genai/AITAM/frontend/src/components/NotificationBell.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QTJGO0FBQUEsYUFBQUEsSUFBQSIsIm5hbWVzIjpbInVzZUNhbGxiYWNrIiwidXNlRWZmZWN0IiwidXNlTWVtbyIsInVzZVN0YXRlIiwiQmVsbCIsIkNoZWNrIiwiQ2hlY2tDaGVjayIsIlgiLCJhcGkiLCJyZWNlbnROb3RpZmljYXRpb25zIiwidW5yZWFkTm90aWZpY2F0aW9uQ291bnQiLCJOb3RpZmljYXRpb25CZWxsIiwicmVmcmVzaEtleSIsIl9zIiwiaXRlbXMiLCJzZXRJdGVtcyIsIm9wZW4iLCJzZXRPcGVuIiwibG9hZGluZyIsInNldExvYWRpbmciLCJlcnJvciIsInNldEVycm9yIiwiZXhwYW5kZWRJZCIsInNldEV4cGFuZGVkSWQiLCJsb2FkIiwiZ2V0Tm90aWZpY2F0aW9ucyIsImVyciIsIm1lc3NhZ2UiLCJ1bnJlYWQiLCJtYXJrUmVhZCIsIml0ZW0iLCJ1cGRhdGVkIiwibWFya05vdGlmaWNhdGlvblJlYWQiLCJpZCIsInByZXZpb3VzIiwibWFwIiwiZW50cnkiLCJtYXJrQWxsUmVhZCIsIm1hcmtBbGxOb3RpZmljYXRpb25zUmVhZCIsImlkcyIsIlNldCIsImhhcyIsInJlYWQiLCJwb3NpdGlvbiIsInZhbHVlIiwiZGlzcGxheSIsInBhZGRpbmciLCJib3JkZXIiLCJib3JkZXJSYWRpdXMiLCJiYWNrZ3JvdW5kIiwiY29sb3IiLCJjdXJzb3IiLCJ0b3AiLCJyaWdodCIsIm1pbldpZHRoIiwiaGVpZ2h0IiwiZm9udFNpemUiLCJmb250V2VpZ2h0IiwicGxhY2VJdGVtcyIsInpJbmRleCIsIndpZHRoIiwibWF4V2lkdGgiLCJib3hTaGFkb3ciLCJhbGlnbkl0ZW1zIiwianVzdGlmeUNvbnRlbnQiLCJtYXJnaW5Cb3R0b20iLCJnYXAiLCJsZW5ndGgiLCJib3JkZXJCb3R0b20iLCJvcGFjaXR5IiwiYWxpZ25TZWxmIiwibWFyZ2luVG9wIiwicHJpb3JpdHkiLCJTdHJpbmciLCJsZXZlbCIsInRvVXBwZXJDYXNlIiwiZmxleCIsInRpdGxlIiwibGluZUhlaWdodCIsImRlcGFydG1lbnQiLCJpbmNpZGVudF9pZCIsIkRhdGUiLCJjcmVhdGVkX2F0IiwidG9Mb2NhbGVTdHJpbmciLCJsaWZlY3ljbGVfc3RhdHVzIiwiZGV0YWlscyIsIm1hcmdpbiIsIkJvb2xlYW4iLCJsb2NhdGlvbl9sYWJlbCIsImxhdGl0dWRlIiwidW5kZWZpbmVkIiwibG9uZ2l0dWRlIiwiaGF6YXJkX3R5cGUiLCJyaXNrX2xldmVsIiwicmlza19zY29yZSIsInRhcmdldGluZ19yZWFzb24iLCJhcHByb3ZhbF9zdGF0dXMiLCJyZXNwb25zZV9zdGF0dXMiLCJBcnJheSIsImlzQXJyYXkiLCJldmlkZW5jZV9zdW1tYXJ5Iiwiam9pbiIsIl9jIl0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIk5vdGlmaWNhdGlvbkJlbGwudHN4Il0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCBSZWFjdCwgeyB1c2VDYWxsYmFjaywgdXNlRWZmZWN0LCB1c2VNZW1vLCB1c2VTdGF0ZSB9IGZyb20gJ3JlYWN0JztcbmltcG9ydCB7IEJlbGwsIENoZWNrLCBDaGVja0NoZWNrLCBYIH0gZnJvbSAnbHVjaWRlLXJlYWN0JztcbmltcG9ydCB7IGFwaSB9IGZyb20gJy4uL3NlcnZpY2VzL2FwaSc7XG5pbXBvcnQgeyBOb3RpZmljYXRpb25JdGVtIH0gZnJvbSAnLi4vdHlwZXMnO1xuaW1wb3J0IHsgcmVjZW50Tm90aWZpY2F0aW9ucywgdW5yZWFkTm90aWZpY2F0aW9uQ291bnQgfSBmcm9tICcuLi9wb3J0YWwvbm90aWZpY2F0aW9uUHJlc2VudGF0aW9uJztcblxuZXhwb3J0IGNvbnN0IE5vdGlmaWNhdGlvbkJlbGw6IFJlYWN0LkZDPHsgcmVmcmVzaEtleT86IG51bWJlciB9PiA9ICh7IHJlZnJlc2hLZXkgPSAwIH0pID0+IHtcbiAgY29uc3QgW2l0ZW1zLCBzZXRJdGVtc10gPSB1c2VTdGF0ZTxOb3RpZmljYXRpb25JdGVtW10+KFtdKTtcbiAgY29uc3QgW29wZW4sIHNldE9wZW5dID0gdXNlU3RhdGUoZmFsc2UpO1xuICBjb25zdCBbbG9hZGluZywgc2V0TG9hZGluZ10gPSB1c2VTdGF0ZSh0cnVlKTtcbiAgY29uc3QgW2Vycm9yLCBzZXRFcnJvcl0gPSB1c2VTdGF0ZTxzdHJpbmcgfCBudWxsPihudWxsKTtcbiAgY29uc3QgW2V4cGFuZGVkSWQsIHNldEV4cGFuZGVkSWRdID0gdXNlU3RhdGU8bnVtYmVyIHwgbnVsbD4obnVsbCk7XG5cbiAgY29uc3QgbG9hZCA9IHVzZUNhbGxiYWNrKGFzeW5jICgpID0+IHtcbiAgICB0cnkge1xuICAgICAgc2V0TG9hZGluZyh0cnVlKTtcbiAgICAgIHNldEl0ZW1zKGF3YWl0IGFwaS5nZXROb3RpZmljYXRpb25zKCkpO1xuICAgICAgc2V0RXJyb3IobnVsbCk7XG4gICAgfSBjYXRjaCAoZXJyOiBhbnkpIHtcbiAgICAgIHNldEVycm9yKGVyci5tZXNzYWdlIHx8ICdVbmFibGUgdG8gbG9hZCBub3RpZmljYXRpb25zLicpO1xuICAgIH0gZmluYWxseSB7XG4gICAgICBzZXRMb2FkaW5nKGZhbHNlKTtcbiAgICB9XG4gIH0sIFtdKTtcblxuICB1c2VFZmZlY3QoKCkgPT4geyB2b2lkIGxvYWQoKTsgfSwgW2xvYWQsIHJlZnJlc2hLZXldKTtcblxuICBjb25zdCB1bnJlYWQgPSB1c2VNZW1vKCgpID0+IHVucmVhZE5vdGlmaWNhdGlvbkNvdW50KGl0ZW1zKSwgW2l0ZW1zXSk7XG4gIGNvbnN0IG1hcmtSZWFkID0gYXN5bmMgKGl0ZW06IE5vdGlmaWNhdGlvbkl0ZW0pID0+IHtcbiAgICB0cnkge1xuICAgICAgY29uc3QgdXBkYXRlZCA9IGF3YWl0IGFwaS5tYXJrTm90aWZpY2F0aW9uUmVhZChpdGVtLmlkKTtcbiAgICAgIHNldEl0ZW1zKChwcmV2aW91cykgPT4gcHJldmlvdXMubWFwKChlbnRyeSkgPT4gZW50cnkuaWQgPT09IHVwZGF0ZWQuaWQgPyB1cGRhdGVkIDogZW50cnkpKTtcbiAgICB9IGNhdGNoIChlcnI6IGFueSkge1xuICAgICAgc2V0RXJyb3IoZXJyLm1lc3NhZ2UgfHwgJ1VuYWJsZSB0byBtYXJrIG5vdGlmaWNhdGlvbiByZWFkLicpO1xuICAgIH1cbiAgfTtcbiAgY29uc3QgbWFya0FsbFJlYWQgPSBhc3luYyAoKSA9PiB7XG4gICAgdHJ5IHtcbiAgICAgIGNvbnN0IHVwZGF0ZWQgPSBhd2FpdCBhcGkubWFya0FsbE5vdGlmaWNhdGlvbnNSZWFkKCk7XG4gICAgICBjb25zdCBpZHMgPSBuZXcgU2V0KHVwZGF0ZWQubWFwKChpdGVtKSA9PiBpdGVtLmlkKSk7XG4gICAgICBzZXRJdGVtcygocHJldmlvdXMpID0+IHByZXZpb3VzLm1hcCgoaXRlbSkgPT4gaWRzLmhhcyhpdGVtLmlkKSA/IHsgLi4uaXRlbSwgcmVhZDogMSB9IDogaXRlbSkpO1xuICAgIH0gY2F0Y2ggKGVycjogYW55KSB7IHNldEVycm9yKGVyci5tZXNzYWdlIHx8ICdVbmFibGUgdG8gbWFyayBub3RpZmljYXRpb25zIHJlYWQuJyk7IH1cbiAgfTtcblxuICByZXR1cm4gKFxuICAgIDxkaXYgY2xhc3NOYW1lPVwibm90aWZpY2F0aW9uLWJlbGxcIiBzdHlsZT17eyBwb3NpdGlvbjogJ3JlbGF0aXZlJyB9fT5cbiAgICAgIDxidXR0b24gY2xhc3NOYW1lPVwibm90aWZpY2F0aW9uLWJlbGwtYnV0dG9uXCIgYXJpYS1sYWJlbD1cIk5vdGlmaWNhdGlvbnNcIiBvbkNsaWNrPXsoKSA9PiBzZXRPcGVuKCh2YWx1ZSkgPT4gIXZhbHVlKX0gc3R5bGU9e3sgcG9zaXRpb246ICdyZWxhdGl2ZScsIGRpc3BsYXk6ICdpbmxpbmUtZmxleCcsIHBhZGRpbmc6ICcwLjQ1cmVtJywgYm9yZGVyOiAnMXB4IHNvbGlkICMzMzQxNTUnLCBib3JkZXJSYWRpdXM6IDcsIGJhY2tncm91bmQ6ICd0cmFuc3BhcmVudCcsIGNvbG9yOiAnI2NiZDVlMScsIGN1cnNvcjogJ3BvaW50ZXInIH19PlxuICAgICAgICA8QmVsbCBzaXplPXsxN30gLz5cbiAgICAgICAge3VucmVhZCA+IDAgJiYgPHNwYW4gc3R5bGU9e3sgcG9zaXRpb246ICdhYnNvbHV0ZScsIHRvcDogLTUsIHJpZ2h0OiAtNSwgbWluV2lkdGg6IDE2LCBoZWlnaHQ6IDE2LCBwYWRkaW5nOiAnMCAzcHgnLCBib3JkZXJSYWRpdXM6IDk5OSwgYmFja2dyb3VuZDogJyNlZjQ0NDQnLCBjb2xvcjogJyNmZmYnLCBmb250U2l6ZTogMTAsIGZvbnRXZWlnaHQ6IDgwMCwgZGlzcGxheTogJ2dyaWQnLCBwbGFjZUl0ZW1zOiAnY2VudGVyJyB9fT57dW5yZWFkID4gOTkgPyAnOTkrJyA6IHVucmVhZH08L3NwYW4+fVxuICAgICAgPC9idXR0b24+XG4gICAgICB7b3BlbiAmJiA8ZGl2IGNsYXNzTmFtZT1cIm5vdGlmaWNhdGlvbi1wYW5lbFwiIHN0eWxlPXt7IHBvc2l0aW9uOiAnYWJzb2x1dGUnLCB6SW5kZXg6IDMwLCB0b3A6ICdjYWxjKDEwMCUgKyAwLjU1cmVtKScsIHJpZ2h0OiAwLCB3aWR0aDogMzIwLCBtYXhXaWR0aDogJzgwdncnLCBiYWNrZ3JvdW5kOiAnI2ZmZicsIGNvbG9yOiAnIzBmMTcyYScsIGJvcmRlcjogJzFweCBzb2xpZCAjY2JkNWUxJywgYm9yZGVyUmFkaXVzOiAxMCwgYm94U2hhZG93OiAnMCAxMnB4IDI4cHggcmdiYSgxNSwyMyw0MiwwLjI1KScsIHBhZGRpbmc6ICcwLjdyZW0nIH19PlxuICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICdmbGV4JywgYWxpZ25JdGVtczogJ2NlbnRlcicsIGp1c3RpZnlDb250ZW50OiAnc3BhY2UtYmV0d2VlbicsIG1hcmdpbkJvdHRvbTogJzAuNDVyZW0nIH19PjxzdHJvbmcgc3R5bGU9e3sgZm9udFNpemU6ICcwLjhyZW0nIH19Pk5vdGlmaWNhdGlvbnM8L3N0cm9uZz48ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICdmbGV4JywgZ2FwOiAnLjM1cmVtJywgYWxpZ25JdGVtczogJ2NlbnRlcicgfX0+e3VucmVhZCA+IDAgJiYgPGJ1dHRvbiBhcmlhLWxhYmVsPVwiTWFyayBhbGwgbm90aWZpY2F0aW9ucyByZWFkXCIgb25DbGljaz17KCkgPT4gdm9pZCBtYXJrQWxsUmVhZCgpfSBzdHlsZT17eyBib3JkZXI6IDAsIGJhY2tncm91bmQ6ICd0cmFuc3BhcmVudCcsIGNvbG9yOiAnIzAyODRjNycsIGN1cnNvcjogJ3BvaW50ZXInIH19PjxDaGVja0NoZWNrIHNpemU9ezE0fSAvPjwvYnV0dG9uPn08YnV0dG9uIGFyaWEtbGFiZWw9XCJDbG9zZSBub3RpZmljYXRpb25zXCIgb25DbGljaz17KCkgPT4gc2V0T3BlbihmYWxzZSl9IHN0eWxlPXt7IGJvcmRlcjogMCwgYmFja2dyb3VuZDogJ3RyYW5zcGFyZW50JywgY29sb3I6ICcjNjQ3NDhiJywgY3Vyc29yOiAncG9pbnRlcicgfX0+PFggc2l6ZT17MTR9IC8+PC9idXR0b24+PC9kaXY+PC9kaXY+XG4gICAgICAgIHtsb2FkaW5nICYmIDxkaXYgc3R5bGU9e3sgcGFkZGluZzogJzFyZW0nLCBjb2xvcjogJyM2NDc0OGInLCBmb250U2l6ZTogJzAuNzVyZW0nIH19PkxvYWRpbmfigKY8L2Rpdj59XG4gICAgICAgIHshbG9hZGluZyAmJiBlcnJvciAmJiA8ZGl2IHN0eWxlPXt7IHBhZGRpbmc6ICcwLjZyZW0nLCBjb2xvcjogJyNiOTFjMWMnLCBiYWNrZ3JvdW5kOiAnI2ZlZjJmMicsIGZvbnRTaXplOiAnMC43MnJlbScsIGJvcmRlclJhZGl1czogNiB9fT57ZXJyb3J9PC9kaXY+fVxuICAgICAgICB7IWxvYWRpbmcgJiYgIWVycm9yICYmIGl0ZW1zLmxlbmd0aCA9PT0gMCAmJiA8ZGl2IHN0eWxlPXt7IHBhZGRpbmc6ICcxcmVtJywgY29sb3I6ICcjNjQ3NDhiJywgZm9udFNpemU6ICcwLjc1cmVtJyB9fT5ObyByZWNlbnQgbm90aWZpY2F0aW9ucy48L2Rpdj59XG4gICAgICAgIHshbG9hZGluZyAmJiAhZXJyb3IgJiYgcmVjZW50Tm90aWZpY2F0aW9ucyhpdGVtcywgMjApLm1hcCgoaXRlbSkgPT4gKFxuICAgICAgICAgIDxkaXYga2V5PXtpdGVtLmlkfSBzdHlsZT17eyBwYWRkaW5nOiAnMC41NXJlbSAwLjI1cmVtJywgYm9yZGVyQm90dG9tOiAnMXB4IHNvbGlkICNlMmU4ZjAnLCBvcGFjaXR5OiBpdGVtLnJlYWQgPyAwLjY1IDogMSB9fT5cbiAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogJ2ZsZXgnLCBnYXA6ICcwLjVyZW0nIH19PlxuICAgICAgICAgICAgICA8c3BhbiBzdHlsZT17eyBhbGlnblNlbGY6ICdmbGV4LXN0YXJ0JywgbWFyZ2luVG9wOiAyLCBwYWRkaW5nOiAnMnB4IDVweCcsIGJvcmRlclJhZGl1czogNCwgYmFja2dyb3VuZDogaXRlbS5wcmlvcml0eSA9PT0gJ2NyaXRpY2FsJyA/ICcjZmVlMmUyJyA6IGl0ZW0ucHJpb3JpdHkgPT09ICdoaWdoJyA/ICcjZmZlZGQ1JyA6ICcjZTBmMmZlJywgY29sb3I6IGl0ZW0ucHJpb3JpdHkgPT09ICdjcml0aWNhbCcgPyAnI2I5MWMxYycgOiBpdGVtLnByaW9yaXR5ID09PSAnaGlnaCcgPyAnI2MyNDEwYycgOiAnIzAzNjlhMScsIGZvbnRTaXplOiA5LCBmb250V2VpZ2h0OiA4MDAgfX0+e1N0cmluZyhpdGVtLnByaW9yaXR5IHx8IGl0ZW0ubGV2ZWwgfHwgJ21lZGl1bScpLnRvVXBwZXJDYXNlKCl9PC9zcGFuPlxuICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBmbGV4OiAxIH19PlxuICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGZvbnRTaXplOiAnMC43MnJlbScsIGZvbnRXZWlnaHQ6IDgwMCB9fT57aXRlbS50aXRsZX08L2Rpdj5cbiAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBtYXJnaW5Ub3A6IDIsIGZvbnRTaXplOiAnMC42OHJlbScsIGNvbG9yOiAnIzQ3NTU2OScsIGxpbmVIZWlnaHQ6IDEuMzUgfX0+e2l0ZW0ubWVzc2FnZX08L2Rpdj5cbiAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBtYXJnaW5Ub3A6IDMsIGZvbnRTaXplOiAnMC42cmVtJywgY29sb3I6ICcjNjQ3NDhiJyB9fT57aXRlbS5kZXBhcnRtZW50IHx8ICdPcGVyYXRpb25zJ317aXRlbS5pbmNpZGVudF9pZCA/IGAgwrcgJHtpdGVtLmluY2lkZW50X2lkfWAgOiAnJ30gwrcge25ldyBEYXRlKGl0ZW0uY3JlYXRlZF9hdCkudG9Mb2NhbGVTdHJpbmcoKX08L2Rpdj5cbiAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBtYXJnaW5Ub3A6IDIsIGZvbnRTaXplOiAnMC41OHJlbScsIGNvbG9yOiAnIzk0YTNiOCcgfX0+U3RhdHVzOiB7aXRlbS5saWZlY3ljbGVfc3RhdHVzIHx8IChpdGVtLnJlYWQgPyAnUkVBRCcgOiAnQ1JFQVRFRCcpfTwvZGl2PlxuICAgICAgICAgICAgPC9kaXY+XG4gICAgICAgICAgICB7IWl0ZW0ucmVhZCAmJiAoXG4gICAgICAgICAgICAgIDxidXR0b24gYXJpYS1sYWJlbD17YE1hcmsgJHtpdGVtLnRpdGxlfSByZWFkYH0gb25DbGljaz17KCkgPT4gdm9pZCBtYXJrUmVhZChpdGVtKX0gc3R5bGU9e3sgYWxpZ25TZWxmOiAnY2VudGVyJywgYm9yZGVyOiAwLCBiYWNrZ3JvdW5kOiAndHJhbnNwYXJlbnQnLCBjb2xvcjogJyMwMjg0YzcnLCBjdXJzb3I6ICdwb2ludGVyJyB9fT5cbiAgICAgICAgICAgICAgICA8Q2hlY2sgc2l6ZT17MTR9IC8+XG4gICAgICAgICAgICAgIDwvYnV0dG9uPlxuICAgICAgICAgICAgKX1cbiAgICAgICAgICAgIDxidXR0b24gdHlwZT1cImJ1dHRvblwiIGFyaWEtbGFiZWw9e2BTaG93IGRldGFpbHMgZm9yICR7aXRlbS50aXRsZX1gfSBvbkNsaWNrPXsoKSA9PiBzZXRFeHBhbmRlZElkKCh2YWx1ZSkgPT4gdmFsdWUgPT09IGl0ZW0uaWQgPyBudWxsIDogaXRlbS5pZCl9IHN0eWxlPXt7IGFsaWduU2VsZjogJ2ZsZXgtc3RhcnQnLCBib3JkZXI6IDAsIGJhY2tncm91bmQ6ICd0cmFuc3BhcmVudCcsIGNvbG9yOiAnIzY0NzQ4YicsIGN1cnNvcjogJ3BvaW50ZXInLCBmb250U2l6ZTogMTEgfX0+e2V4cGFuZGVkSWQgPT09IGl0ZW0uaWQgPyAn4oiSJyA6ICcrJ308L2J1dHRvbj5cbiAgICAgICAgICAgIDwvZGl2PlxuICAgICAgICAgICAge2V4cGFuZGVkSWQgPT09IGl0ZW0uaWQgJiYgaXRlbS5kZXRhaWxzICYmIDxkaXYgc3R5bGU9e3sgbWFyZ2luOiAnMC40NXJlbSAwIDAgMS40cmVtJywgcGFkZGluZzogJzAuNDVyZW0nLCBiYWNrZ3JvdW5kOiAnI2Y4ZmFmYycsIGJvcmRlclJhZGl1czogNiwgZm9udFNpemU6ICcwLjYycmVtJywgY29sb3I6ICcjMzM0MTU1JywgbGluZUhlaWdodDogMS40NSB9fT5cbiAgICAgICAgICAgICAge0Jvb2xlYW4oaXRlbS5kZXRhaWxzLmxvY2F0aW9uX2xhYmVsKSAmJiA8ZGl2PjxzdHJvbmc+TG9jYXRpb246PC9zdHJvbmc+IHtTdHJpbmcoaXRlbS5kZXRhaWxzLmxvY2F0aW9uX2xhYmVsKX08L2Rpdj59XG4gICAgICAgICAgICAgIHsoaXRlbS5kZXRhaWxzLmxhdGl0dWRlICE9PSB1bmRlZmluZWQgJiYgaXRlbS5kZXRhaWxzLmxvbmdpdHVkZSAhPT0gdW5kZWZpbmVkKSAmJiA8ZGl2PjxzdHJvbmc+Q29vcmRpbmF0ZXM6PC9zdHJvbmc+IHtTdHJpbmcoaXRlbS5kZXRhaWxzLmxhdGl0dWRlKX0sIHtTdHJpbmcoaXRlbS5kZXRhaWxzLmxvbmdpdHVkZSl9PC9kaXY+fVxuICAgICAgICAgICAgICB7Qm9vbGVhbihpdGVtLmRldGFpbHMuaGF6YXJkX3R5cGUpICYmIDxkaXY+PHN0cm9uZz5IYXphcmQ6PC9zdHJvbmc+IHtTdHJpbmcoaXRlbS5kZXRhaWxzLmhhemFyZF90eXBlKX08L2Rpdj59XG4gICAgICAgICAgICAgIHsoaXRlbS5kZXRhaWxzLnJpc2tfbGV2ZWwgfHwgaXRlbS5kZXRhaWxzLnJpc2tfc2NvcmUgIT09IHVuZGVmaW5lZCkgJiYgPGRpdj48c3Ryb25nPlJpc2s6PC9zdHJvbmc+IHtTdHJpbmcoaXRlbS5kZXRhaWxzLnJpc2tfbGV2ZWwgfHwgJ1VOS05PV04nKX17aXRlbS5kZXRhaWxzLnJpc2tfc2NvcmUgIT09IHVuZGVmaW5lZCA/IGAgKCR7U3RyaW5nKGl0ZW0uZGV0YWlscy5yaXNrX3Njb3JlKX0pYCA6ICcnfTwvZGl2Pn1cbiAgICAgICAgICAgICAge0Jvb2xlYW4oaXRlbS5kZXRhaWxzLnRhcmdldGluZ19yZWFzb24pICYmIDxkaXY+PHN0cm9uZz5XaHkgdGFyZ2V0ZWQ6PC9zdHJvbmc+IHtTdHJpbmcoaXRlbS5kZXRhaWxzLnRhcmdldGluZ19yZWFzb24pfTwvZGl2Pn1cbiAgICAgICAgICAgICAge0Jvb2xlYW4oaXRlbS5kZXRhaWxzLmFwcHJvdmFsX3N0YXR1cykgJiYgPGRpdj48c3Ryb25nPkFwcHJvdmFsOjwvc3Ryb25nPiB7U3RyaW5nKGl0ZW0uZGV0YWlscy5hcHByb3ZhbF9zdGF0dXMpfTwvZGl2Pn1cbiAgICAgICAgICAgICAge0Jvb2xlYW4oaXRlbS5kZXRhaWxzLnJlc3BvbnNlX3N0YXR1cykgJiYgPGRpdj48c3Ryb25nPlJlc3BvbnNlOjwvc3Ryb25nPiB7U3RyaW5nKGl0ZW0uZGV0YWlscy5yZXNwb25zZV9zdGF0dXMpfTwvZGl2Pn1cbiAgICAgICAgICAgICAge0FycmF5LmlzQXJyYXkoaXRlbS5kZXRhaWxzLmV2aWRlbmNlX3N1bW1hcnkpICYmIGl0ZW0uZGV0YWlscy5ldmlkZW5jZV9zdW1tYXJ5Lmxlbmd0aCA+IDAgJiYgPGRpdj48c3Ryb25nPkV2aWRlbmNlOjwvc3Ryb25nPiB7KGl0ZW0uZGV0YWlscy5ldmlkZW5jZV9zdW1tYXJ5IGFzIHVua25vd25bXSkubWFwKCh2YWx1ZSkgPT4gU3RyaW5nKHZhbHVlKSkuam9pbignOyAnKX08L2Rpdj59XG4gICAgICAgICAgICA8L2Rpdj59XG4gICAgICAgICAgPC9kaXY+XG4gICAgICAgICkpfVxuICAgICAgPC9kaXY+fVxuICAgIDwvZGl2PlxuICApO1xufTtcbiJdLCJmaWxlIjoiQzovVXNlcnMvcmFqdWIvRG93bmxvYWRzL2dlbmFpL0FJVEFNL2Zyb250ZW5kL3NyYy9jb21wb25lbnRzL05vdGlmaWNhdGlvbkJlbGwudHN4In0=

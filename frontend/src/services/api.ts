@@ -9,6 +9,11 @@ import {
   NotificationItem,
   CampusLocation,
   TransportTracking,
+  RiskSummary,
+  RiskPrediction,
+  TravelSafetyResponse,
+  MapOverview,
+  IntelligencePreview,
 } from '../types';
 
 export interface ChatMessage {
@@ -44,6 +49,28 @@ export interface CreateIncidentPayload {
   reported_by?: string;
   latitude?: number;
   longitude?: number;
+  disaster_type?: string;
+  region_id?: string;
+  zone_id?: string;
+  image_url?: string;
+}
+
+export interface EvidenceUploadResponse {
+  evidence_id: string;
+  reference: string;
+  provider: string;
+  status: string;
+  mime_type: string;
+  size_bytes: number;
+  sha256: string;
+  uploaded_at: string;
+}
+
+export interface IntelligencePreviewPayload extends CreateIncidentPayload {
+  latitude: number;
+  longitude: number;
+  location: string;
+  injured_count: number | null;
 }
 
 export interface DepartmentRegistrationPayload {
@@ -52,6 +79,40 @@ export interface DepartmentRegistrationPayload {
   department: string;
   full_name: string;
   role: 'department' | 'department_head';
+}
+
+export interface OrganizationDepartment {
+  id: string;
+  code: string;
+  name: string;
+  department_type: string;
+  description?: string | null;
+  status: 'active' | 'inactive';
+  account_count: number;
+  active_incidents: number;
+  resource_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OrganizationDepartmentAccount {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  department: string;
+  role: string;
+  status: string;
+  created_at?: string;
+}
+
+export interface OrganizationUser {
+  id: number;
+  username: string;
+  email?: string | null;
+  full_name?: string | null;
+  role: string;
+  department?: string | null;
+  status: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +284,79 @@ export const api = {
     return response.json();
   },
 
+  async getNearbyAlerts(zoneId?: string, location?: string): Promise<NotificationItem[]> {
+    const params = new URLSearchParams();
+    if (zoneId) params.set('zone_id', zoneId);
+    if (location) params.set('location', location);
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/alerts/nearby${params.toString() ? `?${params.toString()}` : ''}`);
+    if (!response.ok) throw new Error(`Failed to fetch nearby alerts: ${response.status}`);
+    return response.json();
+  },
+
+  async getRescueRequests(): Promise<any[]> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/rescue-requests`);
+    if (!response.ok) throw new Error(`Failed to fetch rescue requests: ${response.status}`);
+    return response.json();
+  },
+
+  async createRescueRequest(payload: { location: string; description: string; people_count: number; injured_count: number; children_count?: number; elderly_count?: number; medical_emergency?: boolean; hazard_level?: string; latitude?: number; longitude?: number; region_id?: string; zone_id?: string }): Promise<any> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/rescue-requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Rescue request failed' }));
+      throw new Error(error.detail || `Rescue request failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getShelters(): Promise<any[]> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/shelters`);
+    if (!response.ok) throw new Error(`Failed to fetch shelters: ${response.status}`);
+    return response.json();
+  },
+
+  async getHospitals(): Promise<any[]> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/hospitals`);
+    if (!response.ok) throw new Error(`Failed to fetch hospitals: ${response.status}`);
+    return response.json();
+  },
+
+  async getSensors(zoneId?: string): Promise<any[]> {
+    const qs = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/sensors${qs}`);
+    if (!response.ok) throw new Error(`Failed to fetch sensors: ${response.status}`);
+    return response.json();
+  },
+
+  async getSensorStatus(): Promise<any[]> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/sensors/status`);
+    if (!response.ok) throw new Error(`Failed to fetch sensor status: ${response.status}`);
+    return response.json();
+  },
+
+  async getSensorEvents(zoneId?: string): Promise<any[]> {
+    const qs = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/sensor-events${qs}`);
+    if (!response.ok) throw new Error(`Failed to fetch sensor events: ${response.status}`);
+    return response.json();
+  },
+
+  async getAgentRuns(eventId?: string): Promise<any[]> {
+    const qs = eventId ? `?event_id=${encodeURIComponent(eventId)}` : '';
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/agent-runs${qs}`);
+    if (!response.ok) throw new Error(`Failed to fetch orchestration runs: ${response.status}`);
+    return response.json();
+  },
+
+  async getZones(): Promise<any[]> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/zones`);
+    if (!response.ok) throw new Error(`Failed to fetch zones: ${response.status}`);
+    return response.json();
+  },
+
   async markNotificationRead(id: number): Promise<NotificationItem> {
     const response = await authedFetch(`${API_BASE_URL}/api/v1/notifications/${id}/read`, { method: 'POST' });
     if (!response.ok) throw new Error(`Failed to mark notification read: ${response.status}`);
@@ -265,11 +399,12 @@ export const api = {
     return response.json();
   },
 
-  async createIncident(payload: CreateIncidentPayload): Promise<Incident> {
+  async createIncident(payload: CreateIncidentPayload, clientOperationId?: string): Promise<Incident> {
     const response = await authedFetch(`${API_BASE_URL}/api/v1/incidents`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(clientOperationId ? { 'X-Client-Operation-Id': clientOperationId } : {}),
       },
       body: JSON.stringify(payload),
     });
@@ -410,7 +545,7 @@ export const api = {
     return response.json();
   },
 
-  async resolveIncident(incidentId: string, notes: string, resolvedBy: string = 'Campus Safety Commander'): Promise<any> {
+  async resolveIncident(incidentId: string, notes: string, resolvedBy: string = 'AITAM Response Commander'): Promise<any> {
     const response = await authedFetch(`${API_BASE_URL}/api/v1/incidents/${incidentId}/resolve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -423,7 +558,7 @@ export const api = {
     return response.json();
   },
 
-  async confirmResponse(incidentId: string, notes?: string, confirmedBy: string = 'Authorized Campus Operator'): Promise<any> {
+  async confirmResponse(incidentId: string, notes?: string, confirmedBy: string = 'Authorized Response Commander'): Promise<any> {
     const response = await authedFetch(`${API_BASE_URL}/api/v1/incidents/${incidentId}/confirm-response`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -436,7 +571,7 @@ export const api = {
     return response.json();
   },
 
-  async closeIncident(incidentId: string, closingNotes?: string, closedBy: string = 'Authorized Campus Operator'): Promise<any> {
+  async closeIncident(incidentId: string, closingNotes?: string, closedBy: string = 'Authorized Response Commander'): Promise<any> {
     const response = await authedFetch(`${API_BASE_URL}/api/v1/incidents/${incidentId}/close`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -501,6 +636,85 @@ export const api = {
     if (!response.ok) {
       throw new Error(`Failed to calculate route: ${response.status}`);
     }
+    return response.json();
+  },
+
+  async uploadEvidence(file: File): Promise<EvidenceUploadResponse> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/evidence/upload`, { method: 'POST', body: form });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || `Evidence upload failed: ${response.status}`);
+    return data;
+  },
+
+  async getEvidencePreviewUrl(reference?: string | null): Promise<string | null> {
+    const match = /^evidence:([0-9a-f]{32})$/i.exec(String(reference || ''));
+    if (!match) return null;
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/evidence/${match[1]}`);
+    if (!response.ok) throw new Error(`Evidence retrieval failed: ${response.status}`);
+    return URL.createObjectURL(await response.blob());
+  },
+
+  async previewIntelligence(payload: IntelligencePreviewPayload): Promise<IntelligencePreview> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/intelligence/preview`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || `Incident analysis failed: ${response.status}`);
+    return data;
+  },
+
+  async reverseGeocode(latitude: number, longitude: number): Promise<{ label: string; status: string; source: string }> {
+    const query = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) });
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/location/reverse-geocode?${query}`);
+    if (!response.ok) throw new Error(`Reverse geocoding failed: ${response.status}`);
+    return response.json();
+  },
+
+  async replanEvent(eventId: string): Promise<any> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/monitoring/replan/${encodeURIComponent(eventId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Re-planning failed' }));
+      throw new Error(err.detail || `Re-planning failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getRiskSummary(zoneId?: string): Promise<RiskSummary> {
+    const qs = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/risk/summary${qs}`);
+    if (!response.ok) throw new Error(`Failed to fetch risk summary: ${response.status}`);
+    return response.json();
+  },
+
+  async getRiskPredictions(zoneId?: string): Promise<RiskPrediction[]> {
+    const qs = zoneId ? `?zone_id=${encodeURIComponent(zoneId)}` : '';
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/risk${qs}`);
+    if (!response.ok) throw new Error(`Failed to fetch risk predictions: ${response.status}`);
+    return response.json();
+  },
+
+  async checkTravelSafety(destination: string, currentLocation?: string, latitude?: number, longitude?: number): Promise<TravelSafetyResponse> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/travel/safety-check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ destination, current_location: currentLocation || undefined, latitude, longitude }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Travel safety check failed' }));
+      throw new Error(error.detail || `Travel safety check failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getMapOverview(filters: { zone_id?: string; region_id?: string; disaster_type?: string; risk_level?: string; resource_status?: string; sensor_status?: string; alert_status?: string } = {}): Promise<MapOverview> {
+    const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as string[][]).toString();
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/map/overview${query ? `?${query}` : ''}`);
+    if (!response.ok) throw new Error(`Failed to fetch map overview: ${response.status}`);
     return response.json();
   },
 
@@ -593,16 +807,64 @@ export const api = {
         ? err.detail.map((item: any) => item?.msg || 'Invalid request.').join(' ')
         : typeof err?.detail === 'string' ? err.detail : '';
       if (response.status === 401) {
-        throw new Error(detail || 'Your operator session is no longer valid. Please sign in again.');
+        throw new Error(detail || 'Your command session is no longer valid. Please sign in again.');
       }
       if (response.status === 403) {
-        throw new Error(detail || 'Only an administrator or operator can create department accounts.');
+        throw new Error(detail || 'Only an administrator or authorized command account can create department accounts.');
       }
       if (response.status === 409) {
         throw new Error(detail || 'An account with this email already exists.');
       }
       throw new Error(detail || `Department account creation failed (${response.status}).`);
     }
+    return response.json();
+  },
+
+  async getOrganizationOverview(): Promise<{ code: string; name: string; status: string; departments: OrganizationDepartment[] }> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/organization`);
+    if (!response.ok) throw new Error(`Failed to load organization overview: ${response.status}`);
+    return response.json();
+  },
+
+  async createOrganizationDepartment(payload: { code: string; name: string; department_type: string; description?: string }): Promise<OrganizationDepartment> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/organization/departments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.detail || `Department creation failed: ${response.status}`); }
+    return response.json();
+  },
+
+  async updateOrganizationDepartment(code: string, payload: { name?: string; department_type?: string; description?: string; status?: 'active' | 'inactive' }): Promise<OrganizationDepartment> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/organization/departments/${encodeURIComponent(code)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.detail || `Department update failed: ${response.status}`); }
+    return response.json();
+  },
+
+  async getOrganizationAccounts(code: string): Promise<OrganizationDepartmentAccount[]> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/organization/departments/${encodeURIComponent(code)}/accounts`);
+    if (!response.ok) throw new Error(`Failed to load department accounts: ${response.status}`);
+    return response.json();
+  },
+
+  async createOrganizationAccount(code: string, payload: { email: string; password: string; full_name: string; role: string }): Promise<OrganizationDepartmentAccount> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/organization/departments/${encodeURIComponent(code)}/accounts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.detail || `Department account creation failed: ${response.status}`); }
+    return response.json();
+  },
+
+  async updateOrganizationAccount(id: string, payload: { password?: string; full_name?: string; department?: string; role?: string; status?: 'active' | 'suspended' }): Promise<OrganizationDepartmentAccount> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/organization/accounts/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.detail || `Department account update failed: ${response.status}`); }
+    return response.json();
+  },
+
+  async getOrganizationUsers(): Promise<OrganizationUser[]> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/organization/users`);
+    if (!response.ok) throw new Error(`Failed to load organization users: ${response.status}`);
+    return response.json();
+  },
+
+  async assignOrganizationUser(id: number, department: string | null): Promise<OrganizationUser> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/organization/users/${id}/department`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department }) });
+    if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.detail || `User assignment failed: ${response.status}`); }
     return response.json();
   },
 
@@ -651,6 +913,13 @@ export const api = {
     const response = await authedFetch(`${API_BASE_URL}/api/v1/telemetry/location`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-GPS-Device-Token': deviceToken }, body: JSON.stringify(payload) });
     if (!response.ok) throw new Error('Telemetry rejected');
     return response.json();
+  },
+
+  async getProviderHealth(): Promise<any[]> {
+    const response = await authedFetch(`${API_BASE_URL}/api/v1/system/providers`);
+    if (!response.ok) throw new Error(`Failed to fetch provider health: ${response.status}`);
+    const data = await response.json();
+    return data.providers || [];
   },
 
   async getTransportTracking(assignmentId: number): Promise<TransportTracking> {

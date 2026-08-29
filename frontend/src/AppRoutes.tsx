@@ -1,40 +1,18 @@
-import { ReactElement } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
-import { ProtectedRoute, FullScreenMessage } from './auth/ProtectedRoute';
+import { ProtectedRoute } from './auth/ProtectedRoute';
 import {
   canAccessCitizenPortal,
-  canAccessCommandCenter,
   canAccessDepartmentManagement,
   canAccessDepartmentPortal,
+  canAccessCommandCenter,
   homePathFor,
   normalizeDepartment,
 } from './auth/roles';
 import App from './App';
-import { LoginPage } from './pages/LoginPage';
-import { SignupPage } from './pages/SignupPage';
 import { CitizenPortal } from './pages/CitizenPortal';
 import { DepartmentPortal } from './pages/DepartmentPortal';
-
-function RoleHome() {
-  const { user, loading } = useAuth();
-  if (loading) return <FullScreenMessage title="Loading…" />;
-  return <Navigate to={homePathFor(user)} replace />;
-}
-
-// Login/Signup are public, but an already-authenticated user should never see
-// them — send them to their portal instead.
-function PublicOnly({ children }: { children: ReactElement }) {
-  const { user, loading } = useAuth();
-  if (loading) {
-    return <FullScreenMessage title="Loading…" />;
-  }
-  if (user) {
-    const target = homePathFor(user);
-    return <Navigate to={target} replace />;
-  }
-  return children;
-}
+import { LoginPage } from './pages/LoginPage';
 
 
 // Validates the :department param and enforces same-department access before
@@ -53,22 +31,8 @@ function DepartmentPortalRoute() {
 export function AppRoutes() {
   return (
     <Routes>
-      <Route
-        path="/login"
-        element={
-          <PublicOnly>
-            <LoginPage />
-          </PublicOnly>
-        }
-      />
-      <Route
-        path="/signup"
-        element={
-          <PublicOnly>
-            <SignupPage />
-          </PublicOnly>
-        }
-      />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<Navigate to="/login" replace />} />
       <Route
         path="/command"
         element={
@@ -101,8 +65,8 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="/" element={<RoleHome />} />
-      <Route path="*" element={<RoleHome />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }

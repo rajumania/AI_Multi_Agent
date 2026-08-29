@@ -16,10 +16,11 @@
 //     scene creation throws — the feature keeps working, just without 3D.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, AlertTriangle, Clock3, Database, Radio, Route, ShieldAlert, Wifi, WifiOff } from 'lucide-react';
 import { AgentCard } from './AgentCard';
-import { APPROVAL_AGENT_KEY, HUMAN_RESPONSE_TEAMS, VISUAL_AGENTS } from './agentCatalog';
-import { STATUS_VISUALS, deriveAgentDisplayStatus, humanTeamVisual } from './agentStatus';
+import { APPROVAL_AGENT_KEY, VISUAL_AGENTS } from './agentCatalog';
+import { STATUS_VISUALS, deriveAgentDisplayStatus } from './agentStatus';
 import {
   createCommandCenterScene,
   isWebGLAvailable,
@@ -30,12 +31,143 @@ import {
   workflowProgress,
   type IncidentWorkflowState,
 } from '../realtime/workflowReducer';
+import { api } from '../services/api';
+import type { LiveEvent } from '../types';
 
 export interface CommandCenter3DProps {
   /** The REAL, currently-focused incident workflow state (from Phase 2). */
   incident?: IncidentWorkflowState;
   /** Whether the operator's live WebSocket is connected (for the status dot). */
   connected?: boolean;
+  /** The same real event stream already owned by App.tsx (no second socket). */
+  liveEvents?: LiveEvent[];
+}
+
+type ProviderHealth = {
+  provider?: string;
+  status?: string;
+  last_success?: string | null;
+  last_failure?: string | null;
+  last_latency_ms?: number | null;
+  freshness_seconds?: number | null;
+  source?: string;
+  failure_count?: number;
+};
+
+type SensorSnapshot = {
+  sensor_id?: string;
+  sensor_type?: string;
+  value?: number;
+  unit?: string;
+  status?: string;
+  source?: string;
+  location?: string;
+  zone_id?: string;
+  received_at?: string;
+  observed_at?: string;
+  age_seconds?: number;
+  threshold?: number;
+};
+
+type RiskSnapshot = {
+  zone?: string;
+  zone_id?: string;
+  disaster_type?: string;
+  risk_score?: number;
+  risk_level?: string;
+  confidence?: number;
+  stale?: boolean;
+  data_status?: string;
+  created_at?: string;
+  data_freshness_seconds?: number | null;
+};
+
+type PlanSnapshot = {
+  plan_id?: string;
+  severity?: string;
+  location?: string;
+  approval_status?: string;
+  incident_id?: string;
+};
+
+type CommandTelemetry = {
+  providers: ProviderHealth[];
+  sensors: SensorSnapshot[];
+  risks: RiskSnapshot[];
+  plans: PlanSnapshot[];
+  alerts: Array<{ id?: number; level?: string; title?: string; created_at?: string }>;
+  resources: Array<{ status?: string; availability_status?: string }>;
+};
+
+const emptyTelemetry: CommandTelemetry = { providers: [], sensors: [], risks: [], plans: [], alerts: [], resources: [] };
+
+const pretty = (value: unknown) => String(value ?? 'No data available').replace(/_/g, ' ');
+const shortTime = (value: unknown) => value ? new Date(String(value)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No timestamp';
+const ageLabel = (value: unknown) => {
+  if (value == null || !Number.isFinite(Number(value))) return 'No freshness';
+  const seconds = Math.max(0, Number(value));
+  if (seconds < 60) return `${Math.round(seconds)}s ago`;
+  return `${Math.round(seconds / 60)}m ago`;
+};
+
+function providerBadge(provider: ProviderHealth): { label: string; color: string } {
+  const status = String(provider.status || '').toUpperCase();
+  if (status === 'HEALTHY' || status === 'LIVE') return { label: 'LIVE', color: '#34d399' };
+  if (status.includes('FALLBACK')) return { label: 'FALLBACK', color: '#fbbf24' };
+  if (status.includes('STALE')) return { label: 'STALE', color: '#fb923c' };
+  if (status.includes('FAIL') || status.includes('OFFLINE')) return { label: 'OFFLINE', color: '#f87171' };
+  return { label: status || 'UNKNOWN', color: '#94a3b8' };
+}
+
+function sourceBadge(source: unknown): { label: string; color: string } {
+  const value = String(source || '').toUpperCase();
+  if (!value) return { label: 'UNKNOWN', color: '#94a3b8' };
+  if (value.includes('DEMO')) return { label: 'FALLBACK', color: '#fbbf24' };
+  if (value.includes('OFFLINE')) return { label: 'OFFLINE', color: '#f87171' };
+  return { label: 'LIVE', color: '#34d399' };
+}
+
+function riskColor(level: unknown): string {
+  const value = String(level || '').toLowerCase();
+  if (value === 'critical') return '#fb7185';
+  if (value === 'high') return '#fb923c';
+  if (value === 'medium') return '#facc15';
+  return '#34d399';
+}
+
+function useCommandTelemetry(liveEvents: LiveEvent[]) {
+  const [telemetry, setTelemetry] = useState<CommandTelemetry>(emptyTelemetry);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const results = await Promise.allSettled([
+      api.getProviderHealth(),
+      api.getSensorStatus(),
+      api.getRiskPredictions(),
+      api.getResponsePlans(),
+      api.getNotifications(),
+      api.getResources(),
+    ]);
+    const value = (index: number): any[] => results[index].status === 'fulfilled' && Array.isArray(results[index].value) ? results[index].value : [];
+    const failures = results.filter((result) => result.status === 'rejected').length;
+    setTelemetry({ providers: value(0), sensors: value(1), risks: value(2), plans: value(3), alerts: value(4), resources: value(5) });
+    setError(failures === results.length ? 'Command telemetry is unavailable.' : failures ? 'Some telemetry sources are unavailable.' : null);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const timer = window.setInterval(() => void load(), 15000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  const latestEvent = liveEvents.find((event) => ['sensor_anomaly', 'evidence_received', 'image_analysis_started', 'image_analysis_completed', 'evidence_fused', 'risk_updated', 'departments_targeted', 'department_tasks_dispatched', 'notification_created', 'notification_delivered', 'notification_read', 'notification_failed', 'response_plan_generated', 'approval_required', 'approval_approved', 'replan_triggered', 'monitoring_started'].includes(event.event_name));
+  useEffect(() => {
+    if (latestEvent) void load();
+  }, [latestEvent?.timestamp, load]);
+
+  return { telemetry, loading, error };
 }
 
 const PHASE_LABELS: Record<string, string> = {
@@ -52,11 +184,12 @@ const PHASE_LABELS: Record<string, string> = {
   attention: 'Needs attention',
 };
 
-export default function CommandCenter3D({ incident, connected }: CommandCenter3DProps) {
+export default function CommandCenter3D({ incident, connected, liveEvents = [] }: CommandCenter3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<CommandCenterSceneHandle | null>(null);
   const [webglOk, setWebglOk] = useState<boolean>(() => isWebGLAvailable());
   const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
+  const { telemetry, loading: telemetryLoading, error: telemetryError } = useCommandTelemetry(liveEvents);
 
   // Create / dispose the 3D scene. Re-runs only if WebGL availability flips.
   useEffect(() => {
@@ -95,6 +228,18 @@ export default function CommandCenter3D({ incident, connected }: CommandCenter3D
 
   const phase = incident ? derivePhase(incident) : 'idle';
   const progress = incident ? Math.round(workflowProgress(incident) * 100) : 0;
+  const activeRisks = useMemo(
+    () => [...telemetry.risks].sort((a, b) => Number(b.risk_score || 0) - Number(a.risk_score || 0)).slice(0, 3),
+    [telemetry.risks],
+  );
+  const focusedPlan = useMemo(
+    () => telemetry.plans.find((plan) => plan.incident_id === incident?.incidentId) || telemetry.plans[0],
+    [incident?.incidentId, telemetry.plans],
+  );
+  const recentEvents = liveEvents.slice(0, 5);
+  const onlineSensors = telemetry.sensors.filter((sensor) => !['OFFLINE', 'UNAVAILABLE'].includes(String(sensor.status || '').toUpperCase())).length;
+  const criticalAlerts = telemetry.alerts.filter((alert) => ['critical', 'high'].includes(String(alert.level || '').toLowerCase())).length;
+  const pendingPlans = telemetry.plans.filter((plan) => String(plan.approval_status || '').toLowerCase() === 'pending').length;
 
   const cards = useMemo(() => {
     return VISUAL_AGENTS.map((agent) => {
@@ -118,17 +263,6 @@ export default function CommandCenter3D({ incident, connected }: CommandCenter3D
       };
     });
   }, [incident, selectedAgentKey]);
-
-  const humanCards = useMemo(() => HUMAN_RESPONSE_TEAMS.map((team) => {
-    const assignment = incident?.assignments?.[team.department];
-    const visual = humanTeamVisual(assignment?.status, team.accent);
-    return {
-      ...team,
-      status: visual.status,
-      message: assignment ? `${assignment.status}${assignment.assignedResources.length ? ` · ${assignment.assignedResources.join(', ')}` : ''}` : 'No assignment yet',
-      active: ['WORKING', 'COMPLETED'].includes(visual.status) && assignment?.status !== 'COMPLETED',
-    };
-  }), [incident]);
 
   const selectedAgentInfo = useMemo(() => {
     if (!selectedAgentKey) return null;
@@ -197,6 +331,37 @@ export default function CommandCenter3D({ incident, connected }: CommandCenter3D
         </div>
       </header>
 
+      <section className="command-center-telemetry" aria-label="Current command telemetry">
+        {[
+          { label: 'ACTIVE INCIDENT', value: incident ? '1' : '0', icon: <ShieldAlert size={15} /> },
+          { label: 'SENSORS ONLINE', value: telemetryLoading ? '…' : `${onlineSensors}/${telemetry.sensors.length || 0}`, icon: <Radio size={15} /> },
+          { label: 'HIGH / CRITICAL', value: telemetryLoading ? '…' : String(activeRisks.filter((risk) => ['high', 'critical'].includes(String(risk.risk_level || '').toLowerCase())).length), icon: <Activity size={15} /> },
+          { label: 'PENDING APPROVAL', value: telemetryLoading ? '…' : String(pendingPlans), icon: <AlertTriangle size={15} /> },
+          { label: 'ALERTS', value: telemetryLoading ? '…' : String(criticalAlerts), icon: <Wifi size={15} /> },
+        ].map((metric) => (
+          <div className="command-center-metric" key={metric.label}>
+            <span className="command-center-metric-icon">{metric.icon}</span>
+            <span><strong>{metric.value}</strong><small>{metric.label}</small></span>
+          </div>
+        ))}
+      </section>
+
+      {telemetryError && (
+        <div className="command-center-data-warning" role="status">
+          <AlertTriangle size={14} /> {telemetryError} Values shown below are from the sources that responded.
+        </div>
+      )}
+
+      <section className="command-center-provider-strip" aria-label="External data provider status">
+        <div className="command-center-panel-heading"><Database size={14} /> DATA SOURCES</div>
+        {telemetryLoading && <span className="command-center-empty">Checking provider health…</span>}
+        {!telemetryLoading && telemetry.providers.length === 0 && <span className="command-center-empty">No provider status available</span>}
+        {!telemetryLoading && telemetry.providers.slice(0, 6).map((provider, index) => {
+          const badge = providerBadge(provider);
+          return <span className="command-center-provider" key={`${provider.provider || provider.source}-${index}`}><strong>{pretty(provider.provider || provider.source)}</strong><em style={{ color: badge.color }}>● {badge.label}</em><small>{pretty(provider.source)} · {provider.last_latency_ms == null ? 'No latency' : `${provider.last_latency_ms}ms`} · {ageLabel(provider.freshness_seconds)}</small></span>;
+        })}
+      </section>
+
       {/* State legend so the color language is legible to operators/judges. */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
         {Object.values(STATUS_VISUALS).map((v) => (
@@ -208,6 +373,7 @@ export default function CommandCenter3D({ incident, connected }: CommandCenter3D
       </div>
 
       <div
+        className="command-center-stage"
         style={{
           position: 'relative',
           flex: 1,
@@ -238,6 +404,36 @@ export default function CommandCenter3D({ incident, connected }: CommandCenter3D
             3D view unavailable on this device — showing live agent status
           </div>
         )}
+
+        <aside className="command-center-stage-panel command-center-stage-panel-left" aria-label="Live sensor feed">
+          <div className="command-center-panel-heading"><Radio size={14} /> LIVE SENSOR FEED</div>
+          {telemetryLoading && <div className="command-center-empty">Loading sensor telemetry…</div>}
+          {!telemetryLoading && telemetry.sensors.length === 0 && <div className="command-center-empty">No data available</div>}
+          {!telemetryLoading && telemetry.sensors.slice(0, 4).map((sensor, index) => {
+            const badge = sourceBadge(sensor.source);
+            const status = String(sensor.status || 'UNKNOWN').toUpperCase();
+            return (
+              <div className="command-center-sensor-row" key={`${sensor.sensor_id}-${index}`}>
+                <span className="command-center-sensor-dot" style={{ background: status === 'CRITICAL' ? '#fb7185' : status === 'WARNING' ? '#facc15' : '#34d399' }} />
+                <span className="command-center-sensor-copy"><strong>{pretty(sensor.sensor_type)}</strong><small>{sensor.sensor_id || 'No sensor ID'} · {sensor.location || sensor.zone_id || 'No location'}</small></span>
+                <span className="command-center-sensor-value"><strong>{sensor.value ?? '—'}</strong><small>{sensor.unit || ''}</small><em style={{ color: badge.color }}>{badge.label}</em></span>
+              </div>
+            );
+          })}
+        </aside>
+
+        <aside className="command-center-stage-panel command-center-stage-panel-right" aria-label="Risk and response snapshot">
+          <div className="command-center-panel-heading"><ShieldAlert size={14} /> RESPONSE SNAPSHOT</div>
+          {activeRisks.length === 0 && <div className="command-center-empty">No data available</div>}
+          {activeRisks.map((risk, index) => (
+            <div className="command-center-risk-row" key={`${risk.zone_id || risk.zone}-${risk.disaster_type}-${index}`}>
+              <div><strong>{pretty(risk.disaster_type)}</strong><small>{risk.zone || risk.zone_id || 'No affected zone'}</small></div>
+              <div className="command-center-risk-score" style={{ color: riskColor(risk.risk_level) }}><strong>{risk.risk_score == null ? '—' : risk.risk_score.toFixed(2)}</strong><small>{pretty(risk.risk_level).toUpperCase()}</small></div>
+              <span className="command-center-data-badge" style={{ color: sourceBadge(risk.data_status).color }}>{sourceBadge(risk.data_status).label}</span>
+            </div>
+          ))}
+          <div className="command-center-plan-line"><Route size={13} /> {focusedPlan ? <span><strong>{pretty(focusedPlan.approval_status)}</strong> · {focusedPlan.location || 'No affected location'}</span> : 'No response plan available'}</div>
+        </aside>
 
         {/* Selected Agent Details Panel Overlay (Futuristic EOC glass design) */}
         {selectedAgentInfo && (
@@ -274,6 +470,8 @@ export default function CommandCenter3D({ incident, connected }: CommandCenter3D
                 </div>
               </div>
               <button
+                type="button"
+                aria-label="Close agent details"
                 onClick={() => setSelectedAgentKey(null)}
                 style={{
                   background: 'transparent',
@@ -440,22 +638,25 @@ export default function CommandCenter3D({ incident, connected }: CommandCenter3D
               </div>
             ))}
           </div>
-          <div style={{ width: '100%', marginTop: '0.6rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.6rem' }}>
-            {humanCards.map((team) => (
-              <div key={team.key} style={{ pointerEvents: 'auto' }}>
-                <AgentCard
-                  title={team.title}
-                  subtitle={team.subtitle}
-                  accent={team.accent}
-                  status={team.status}
-                  message={team.message}
-                  active={team.active}
-                />
+        </div>
+      </div>
+
+      <section className="command-center-event-rail" aria-label="Recent backend workflow events">
+        <div className="command-center-panel-heading"><Clock3 size={14} /> REAL EVENT STREAM <span>{connected ? <><Wifi size={12} /> CONNECTED</> : <><WifiOff size={12} /> OFFLINE</>}</span></div>
+        {recentEvents.length === 0 ? (
+          <div className="command-center-empty">No workflow events received yet. Agent nodes remain idle until the backend emits a real event.</div>
+        ) : (
+          <div className="command-center-event-list">
+            {recentEvents.map((event, index) => (
+              <div className="command-center-event" key={`${event.event_name}-${event.timestamp}-${index}`}>
+                <strong>{pretty(event.event_name).toUpperCase()}</strong>
+                <span>{event.incident_id || 'system'}</span>
+                <time dateTime={event.timestamp}>{shortTime(event.timestamp)}</time>
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        )}
+      </section>
     </div>
   );
 }

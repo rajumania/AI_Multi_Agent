@@ -3,9 +3,10 @@ from typing import List, Optional, Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from backend.database.database import get_db
+from backend.database.models import IncidentDB
 from backend.services.response_service import response_service
 from backend.models.response import ResponsePlanRead, ApprovalStatus
-from backend.api.deps import get_command_principal
+from backend.api.deps import get_command_principal, get_approval_viewer
 from backend.services.auth_service import Principal
 
 router = APIRouter(prefix="/api/v1/response-plans", tags=["Response Plans"])
@@ -50,7 +51,8 @@ def generate_response_plan(
 def list_response_plans(
     incident_id: Optional[str] = Query(None),
     status_filter: Optional[ApprovalStatus] = Query(None, alias="status"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_approval_viewer),
 ):
     """
     List all generated response plans with optional incident or approval status filter.
@@ -60,13 +62,32 @@ def list_response_plans(
         status_filter=status_filter.value if status_filter else None,
         db=db
     )
+    if principal.is_department:
+        visible = []
+        for plan in plans:
+            incident = db.query(IncidentDB).filter_by(incident_id=plan.incident_id).first()
+            try:
+                routed = json.loads(incident.required_departments or "[]") if incident else []
+            except (TypeError, ValueError):
+                routed = []
+            if principal.department in {str(item).upper() for item in routed}:
+                visible.append(plan)
+        plans = visible
     return [serialize_plan_model(p) for p in plans]
 
 
 @router.get("/{plan_id}", response_model=ResponsePlanRead)
-def get_response_plan(plan_id: str, db: Session = Depends(get_db)):
+def get_response_plan(plan_id: str, db: Session = Depends(get_db), principal: Principal = Depends(get_approval_viewer)):
     """
     Retrieve specific response plan by ID.
     """
     plan_db = response_service.get_plan(plan_id=plan_id, db=db)
+    if principal.is_department:
+        incident = db.query(IncidentDB).filter_by(incident_id=plan_db.incident_id).first()
+        try:
+            routed = json.loads(incident.required_departments or "[]") if incident else []
+        except (TypeError, ValueError):
+            routed = []
+        if principal.department not in {str(item).upper() for item in routed}:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Response plan not found.")
     return serialize_plan_model(plan_db)

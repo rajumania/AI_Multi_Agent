@@ -1,122 +1,93 @@
-# PHASE 3 — Real-Time 3D AI-Agent Command Center
+# Phase 3 Report — Multi-Agent Disaster Intelligence and Continuous Monitoring
 
-**PHASE:** 3 of 17 — Lazy-loaded 3D AI-agent visualization system
+## Scope and status
 
-**STATUS:** ✅ Implemented in code — ⏳ awaiting your verification (`npm install`, `npm test`, `npm run build`)
+Phase 3 is implemented on top of the existing FastAPI, SQLAlchemy, React, authentication/RBAC, WebSocket and LangGraph architecture. Phase 2 risk prediction remains the source of numerical risk scores. This phase adds converging human and sensor triggers, conditional specialist fan-out, operational coordination, travel safety, monitoring/re-planning and audit coverage.
 
----
+This prototype provides decision-support risk estimation and is not an authoritative disaster forecasting system.
 
-## Implemented
+## Agent architecture
 
-A real, lazy-loaded 3D command center that visualizes the five headline AI agents and reacts **only** to real backend state — no timers, no scripted sequence, no fake progress. The backend remains the single source of truth; this layer renders the Phase 2 realtime state and never drives the workflow.
+`backend/graph/disaster_workflow.py` defines a strongly typed `DisasterIntelligenceState`. The Supervisor conditionally selects specialists and uses LangGraph `Send` for parallel independent analysis. Resource coordination, deterministic priority calculation, safe routing, response planning, approval, monitoring and recovery then run sequentially because each stage consumes the previous stage's state.
 
-What went in:
+The existing incident workflow and agents are preserved. Phase 3 maps them as follows:
 
-- **Five visual agents**, each bound to a REAL LangGraph backend node key so every node is event-driven:
-  - Incident Intelligence → `supervisor`
-  - Medical Response → `medical`
-  - Safety / Hazard → `fire`
-  - Resource Allocation → `transport`
-  - Response Planning → `synthesizer` (also the human-approval gate)
-- **All six required visual states**, derived purely from real signals in the Phase 2 model:
-  - `IDLE` (no incident / not started), `QUEUED` (workflow started, this agent's turn pending), `WORKING` (real `agent_started`/`agent_progress`), `COMPLETED` (real `agent_completed`), `FAILED` (real `agent_failed`), `WAITING_APPROVAL` (real `approval_required` still pending on the planner).
-  - Working/waiting states pulse; completed/failed are steady. Every transition is caused by an actual backend event.
-- **Reusable components**: a three.js `AgentNode` factory (glowing icosahedron core + identity ring) and a DOM `AgentCard` (status badge, message, structured-output chips). The card only ever shows structured, non-sensitive output — never raw reasoning.
-- **Imperative three.js scene** (`CommandCenterScene`): renderer, camera, lights, connector lines, manual pointer-drag + gentle auto-orbit, resize handling, and a full `dispose()` that releases every GPU resource and listener. WebGL creation is guarded.
-- **Lazy loading / code splitting**: the heavy 3D view (three.js) is behind `React.lazy` + `Suspense`, wrapped in an error boundary. It is reached only from the privileged `/command` operator shell — never from login/signup, and never in the main bundle.
-- **Graceful degradation**: if WebGL is unavailable or the chunk fails, the same AgentCards render as a DOM-only fallback, so the feature is never bricked.
-- **Wiring**: the operator shell now folds each real WebSocket event into the Phase 2 reducer using the **existing single socket** (no second WebSocket), and exposes a new privileged **"AI Command 3D"** tab.
+- Medical → medical emergency and hospital coordination
+- Security → public safety and access-control recommendations
+- Transport → emergency transport context
+- Facilities → infrastructure and utilities context
+- Communication → approved disaster/community communications
+- Supervisor/orchestrator → Incident Commander and conditional specialist router
 
-### Rendering approach note (transparency)
+The complete diagram is in [AGENT_ARCHITECTURE.md](AGENT_ARCHITECTURE.md).
 
-You chose **Three.js / WebGL**. The option text mentioned `@react-three/fiber` + `drei`, but I implemented with **core `three` only** (imperative renderer + manual orbit, no `fiber`/`drei`, no `three/examples/jsm` imports). This keeps the dependency footprint and build risk minimal (Rule 23) while delivering the same real WebGL 3D. If you'd prefer the react-three-fiber stack, I can switch in a follow-up — but core three is lighter and lazy-loaded.
+## Sensor and event architecture
 
----
+`SensorMonitoringService` normalizes rainfall, river/water level, soil moisture, ground movement/tilt, temperature and wind readings. `SensorAnomalyDetector` applies validated thresholds and rise detection. Observations are stored in `sensor_observations`; anomalies are stored in `sensor_events`, mirrored into the Phase 2 weather/environment observations where applicable, published through the existing WebSocket event engine, and audited.
 
-## Files changed
+`DEMO_SIMULATION` is the deterministic provider/source label. No simulated hardware reading is presented as live data. Sensor anomalies and human/community reports both converge through `trigger_disaster_intelligence()` into the same risk prediction and LangGraph workflow.
 
-**New (`frontend/src/command3d/`):**
+## Deterministic tools and coordination
 
-- `agentCatalog.ts` — the 5 visual agents + backend-key bindings + connections (pure, DOM-free, three-free)
-- `agentStatus.ts` — six-state derivation + status→visual mapping (pure, DOM-free, three-free)
-- `AgentNode.ts` — reusable three.js node factory
-- `AgentCard.tsx` — reusable DOM status card
-- `CommandCenterScene.ts` — imperative three.js scene (WebGL-guarded, disposable)
-- `CommandCenter3D.tsx` — **default export**, the lazy target; owns scene lifecycle + overlay + fallback
-- `CommandCenter3DLazy.tsx` — `React.lazy` + `Suspense` + error boundary (the only module the shell imports)
-- `agentStatus.test.ts` — DOM-free vitest suite (catalog integrity + all six states)
+- `priority_engine.py` calculates bounded rescue priority from people count, injuries, children, elderly people, medical emergency, hazard/risk, waiting time and accessibility.
+- `resource_coordination.py` queries real database resources, shelters and hospitals; agents do not hard-code availability.
+- `safe_routing.py` uses the existing verified road graph only for known geometry and explicitly returns `route_unavailable` where geometry is not available.
+- `travel_safety.py` combines the latest persisted risk, weather and active alerts and returns `SAFE`, `CAUTION`, `NOT_RECOMMENDED` or `CRITICAL` with reasons.
+- Response plans use the existing `ResponsePlanDB` and remain `pending` until the existing human approval workflow authorizes high-impact actions.
 
-**Modified:**
+## Nepal Mountain demonstration
 
-- `frontend/package.json` — added `three ^0.169.0` (dep) and `@types/three ^0.169.0` (devDep)
-- `frontend/src/App.tsx` — added `useReducer(reduceRealtime)` fed by the **existing** socket's `onmessage`; added the lazy "AI Command 3D" tab; computes the active workflow via `getActiveWorkflow`
-- `frontend/src/components/Sidebar.tsx` — added the "AI Command 3D" nav item (Cpu icon)
+`POST /api/v1/sensor-simulations` with `{"scenario":"nepal_mountain"}` inserts clearly labelled simulated readings for DEMO N-14: 3,400 m elevation, high slope/terrain vulnerability, 180 mm rainfall, 92% soil moisture, rising river level and ground movement. The same Phase 2 engine evaluates both flood and landslide hazards; the final score is not hard-coded. The critical path creates an administrative early-warning recommendation, a community-targeted warning with cooldown protection, an approval-gated response plan and an auditable agent run. Re-planning creates a new approval-gated plan after conditions change.
 
-No existing files were rebuilt, replaced, or deleted.
+Other deterministic scenarios: `urban_flood`, `cyclone` and `heatwave`.
 
----
+## Workflows
 
-## Existing functionality preserved: **YES**
+### Administrative
 
-- No changes to authentication, RBAC, the database, the backend, the incident workflow, the existing AI agents, or existing APIs.
-- **No duplicate WebSocket** — the reducer is fed by the one socket App.tsx already owns (Rule 11).
-- The reducer returns the same state object for irrelevant events, so the operator dashboard re-renders only on meaningful change.
-- Login/signup remain lightweight: they never import App, and the 3D chunk is `React.lazy`-split, so it is not in the main bundle (Rules 24–26).
-- All prior tabs (Overview, Incidents, Resources, Response Plans, Activity Logs) are untouched.
+The admin/operator can submit a disaster event or sensor reading, inspect risk and agent results, view the trace, review resources and the pending response plan, and use the existing approval controls before dispatch. Critical conditions are represented as queued/simulated administrative/community notifications; no external department is claimed to have been contacted.
 
----
+### Community
 
-## Backend tests
+Community text and rescue reports create an existing-compatible incident and rescue request, add validated community signals to environmental observations, run the same deterministic risk pipeline, and create a geographic zone-targeted notification for critical conditions. Nearby alerts are exposed only for the requested zone/location.
 
-Not applicable to Phase 3 (frontend-only). No backend files were modified. Backend suites remain to be run separately as before:
+### Tourist
 
-```
-python -m pytest backend/tests -q
-python -m pytest tests -q
-```
+The new Travel Safety page calls the backend safety-check endpoint. It presents current risk, hazards, active warnings, weather summary, route status, recommendation and reasons. It uses cautious language and does not claim certainty about future conditions.
 
-(Note: Phase 1 backend lifecycle-event emission — the code that populates these node states at runtime — is implemented but its pytest run is still pending your confirmation. The Phase 3 UI is verified independently by the pure unit tests + build; live node animation will flow once Phase 1 events are confirmed green.)
+## Approval, monitoring and audit
 
----
+High-impact actions—public warnings, evacuation recommendations, dispatch, resource deployment and access restrictions—remain approval-gated. Monitoring records that weather, sensors, resources, routes, shelters, hospitals and reports should be observed; the re-plan endpoint reruns the same pipeline with `replan=true` and produces a new approval-gated plan. Sensor ingestion, agent execution, resource/priority calculations, plans, approval-required events, alerts and re-planning are recorded through the existing audit/event systems.
 
-## Frontend tests
+## APIs
 
-**Written, not yet executed here** (this environment cannot run npm/vitest — disk-constrained). Please run on your Windows venv:
+All routes use the existing `/api/v1` namespace:
 
-```
-cd frontend
-npm install        # REQUIRED — pulls in three + @types/three
-npm test
-```
+- `POST /events`
+- `POST /sensor-events`, `GET /sensors`, `GET /sensors/status`, `GET /sensor-events`
+- `POST /sensor-simulations`
+- `GET /departments`, `GET /departments/{id}`
+- `GET /agent-runs/{id}`, `GET /agent-runs/{id}/trace`
+- `GET /alerts/nearby`
+- `POST /monitoring/replan/{event_id}`
+- `POST/GET /travel/safety-check`
 
-New suite: `src/command3d/agentStatus.test.ts` — covers catalog integrity (exactly 5 agents, unique real keys, hex accents, valid connections, approval-gate binding), the full `STATUS_VISUALS` mapping, `workflowStarted`, and all six derived states including the `WAITING_APPROVAL` override and its clearing after a decision. Expected to add to the existing 58 passing tests.
+Existing Phase 2 risk and weather/environment endpoints remain available. Existing WebSocket infrastructure now carries `SENSOR_UPDATE`, `ENVIRONMENT_ANOMALY`, `DISASTER_DETECTED`, `COMMUNITY_ALERT`, `RESPONSE_PLAN_UPDATED`, `APPROVAL_REQUIRED`, `REPLAN_TRIGGERED`, and related risk/resource/travel events.
 
----
+## Tests and validation
 
-## Build
+- Backend: **107 passed** (`backend/tests`), including Phase 3 sensor, convergence, Nepal, travel, priority, resource, routing and API coverage.
+- Frontend: **92 passed**.
+- Frontend production build: **successful**.
+- Legacy suite: **52 passed, 1 skipped, 1 known timing-related failure**, unchanged in `tests/test_supervisor_agent.py::test_api_analyze_incident_by_id`; it is caused by existing background/async Gemini cleanup timing and was not hidden or weakened.
+- Python backend compilation: successful.
+- Application import and graph initialization: successful; existing and Phase 3 graphs both initialize.
 
-**Not yet executed here.** Please run:
+## Known limitations and next phase
 
-```
-cd frontend
-npm run build      # tsc && vite build
-```
+- External IoT hardware, advanced GIS layers, route geometry outside the existing verified local graph, complete PWA/offline caching and production notification integrations are not implemented in Phase 3.
+- The current demo/provider fallback remains explicitly labelled and should be replaced or supplemented with configured trusted providers before operational use.
+- The existing Google Generative AI package emits a deprecation warning; it was not changed because framework/provider migration is outside this phase.
+- The Vite bundle retains the existing large-chunk warning; the build is successful.
 
-Everything was written against your strict TS config (`noUnusedLocals`/`noUnusedParameters`, etc.). Expect Vite to emit a separate lazy chunk for the 3D view (three.js), downloaded only when the "AI Command 3D" tab is opened.
-
----
-
-## Known issues
-
-- **`npm install` is required before test/build** — `three` and `@types/three` are new dependencies.
-- **Tests + build have not been run in this environment** (sandbox is out of disk). They are handed to you to run on the Windows venv; I have not claimed them green.
-- The existing Vite **chunk-size warning** will likely remain and may now also reference the new 3D chunk — that is expected and benign (the chunk is lazy-loaded).
-- Live 3D animation depends on **Phase 1** backend events actually flowing; until you confirm the Phase 1 pytest suites, nodes will render/idle correctly but won't animate through WORKING→COMPLETED without those real events.
-
----
-
-## Next phase
-
-**Phase 4 — Student real-time view (role-safe progress).** 
-
-Per your standing instruction, I will **not** proceed to Phase 4 until you confirm Phase 3 is verified: `npm install`, then `npm test` and `npm run build` both green.
+Phase 4 should consume the persisted risk, sensor, event, resource and alert interfaces to implement the complete interactive vulnerability map. Offline/PWA and final deployment changes remain later-phase work.

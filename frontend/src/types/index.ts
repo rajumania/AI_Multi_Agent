@@ -10,6 +10,37 @@ export type IncidentType =
   | 'other'
   | 'unknown';
 
+export type DisasterType =
+  | 'flood'
+  | 'urban_flood'
+  | 'cyclone'
+  | 'landslide'
+  | 'severe_weather'
+  | 'heatwave'
+  | 'earthquake'
+  | 'fire'
+  | 'other';
+
+export interface IntelligencePreview {
+  location: string;
+  latitude: number;
+  longitude: number;
+  reverse_geocode?: { label?: string; status?: string; source?: string } | null;
+  weather: Record<string, any>;
+  environmental: Record<string, any>[];
+  earthquakes: Record<string, any>[];
+  earthquake_status: string;
+  severe_weather: Record<string, any>[];
+  severe_weather_status: string;
+  routes: Record<string, any>[];
+  evidence: Record<string, any>;
+  risk: { score: number; level: string; confidence: number; contributing_factors: string[]; explanation: string; data_status: string; [key: string]: any };
+  departments: { department: string; reason: string }[];
+  image_analysis: Record<string, any>;
+  provider_status: Record<string, any>[];
+  data_status: string;
+}
+
 export type SeverityLevel =
   | 'low'
   | 'medium'
@@ -41,6 +72,7 @@ export interface Incident {
   incident_id: string;
   description: string;
   incident_type: IncidentType;
+  disaster_type?: DisasterType | null;
   location: string;
   severity: SeverityLevel;
   injured_count: number | null; // Strict null for unknown
@@ -48,6 +80,7 @@ export interface Incident {
   reported_by?: string;
   latitude?: number | null;
   longitude?: number | null;
+  image_url?: string | null;
   status: IncidentStatus;
   ai_provider_status?: string | null;
   current_step?: string;
@@ -58,6 +91,12 @@ export interface Incident {
   closed_at?: string;
   resolution_note?: string;
   required_departments?: string[];
+  region_id?: string | null;
+  zone_id?: string | null;
+  community_id?: string | null;
+  client_operation_id?: string | null;
+  detection_evidence?: Record<string, unknown> | null;
+  sync_state?: 'queued' | 'synced';
   created_at: string;
   updated_at: string;
 }
@@ -141,10 +180,21 @@ export type ResourceType =
   | 'medical_center'
   | 'facility'
   | 'fire_response'
+  | 'hospital'
+  | 'clinic'
+  | 'rescue_team'
+  | 'fire_service'
+  | 'police'
+  | 'emergency_service'
+  | 'boat'
+  | 'food'
+  | 'water'
+  | 'emergency_kit'
   | 'other';
 
 export type AvailabilityStatus =
   | 'available'
+  | 'assigned'
   | 'busy'
   | 'unavailable'
   | 'maintenance'
@@ -163,6 +213,10 @@ export interface CampusResource {
   quantity: number;
   contact?: string;
   last_updated?: string;
+  current_assignment?: string | null;
+  department?: string | null;
+  emergency_beds?: number | null;
+  is_demo?: boolean | number;
 }
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -312,6 +366,82 @@ export interface NotificationItem {
   level: string;
   read: number;
   created_at: string;
+  priority?: string;
+  lifecycle_status?: string;
+  delivered_at?: string | null;
+  read_at?: string | null;
+  details?: Record<string, unknown>;
 }
+
+export interface RiskPrediction {
+  prediction_id: string;
+  disaster_type: string;
+  zone_id?: string | null;
+  zone: string;
+  region_id?: string | null;
+  risk_score: number;
+  risk_level: string;
+  confidence: number;
+  contributing_factors: string[];
+  recommendations: string[];
+  explanation: string;
+  features: Record<string, number>;
+  data_status: string;
+  data_freshness_seconds?: number | null;
+  stale: boolean;
+  created_at: string;
+}
+
+export interface RiskSummary {
+  latest: RiskPrediction | null;
+  trend: RiskPrediction[];
+  warning_status: string;
+  updated_at?: string | null;
+}
+
+export interface TravelSafetyResponse {
+  destination: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  risk_score: number;
+  risk_level: string;
+  hazards: string[];
+  weather_summary: string;
+  active_alerts: string[];
+  route_status: string;
+  recommendation: 'SAFE' | 'CAUTION' | 'NOT_RECOMMENDED' | 'CRITICAL' | string;
+  reasons: string[];
+  safer_alternatives: string[];
+  last_updated: string;
+  data_status?: string;
+  data_sources?: string[];
+  freshness_seconds?: number | null;
+}
+
+export interface MapOverview {
+  generated_at: string;
+  data_status: string;
+  affected_population: number;
+  risks: MapRisk[];
+  zones: MapZone[];
+  hazards: MapHazard[];
+  sensors: MapSensor[];
+  incidents: MapIncident[];
+  rescue_requests: MapRescueRequest[];
+  resources: MapResource[];
+  routes: MapRoute[];
+  alerts: MapAlert[];
+}
+
+export interface MapRisk { id: string; zone_id: string; zone: string; disaster_type: string; risk_score: number; risk_level: string; confidence: number; timestamp?: string; data_freshness_seconds?: number | null; stale: boolean; contributing_factors: string[]; geometry?: GeoJSONGeometry | null; data_status?: string; is_demo?: boolean; }
+export interface MapZone { id: string; region_id: string; name: string; population?: number | null; latitude?: number | null; longitude?: number | null; elevation_m?: number | null; slope_deg?: number | null; vulnerability_score?: number | null; hazard_classification?: string | null; geometry?: GeoJSONGeometry | null; geometry_source?: string; is_demo?: boolean; }
+export interface MapHazard { id: string; zone_id: string; name: string; hazard_type: string; population?: number | null; geometry?: GeoJSONGeometry | null; geometry_source?: string; is_demo?: boolean; }
+export interface MapSensor { id: string; sensor_id: string; type: string; zone_id?: string | null; location?: string | null; latitude?: number | null; longitude?: number | null; value: number; previous_value?: number | null; trend: string; status: string; unit?: string | null; last_update?: string; source: string; is_demo?: boolean; }
+export interface MapIncident { id: string; incident_id: string; disaster_type: string; risk_level: string; priority?: number | null; people_affected?: number | null; location: string; status: string; created_at?: string; latitude?: number | null; longitude?: number | null; source?: string; is_demo?: boolean; }
+export interface MapRescueRequest { id: string; request_id: string; zone_id?: string | null; location: string; latitude?: number | null; longitude?: number | null; people_count: number; injured_count: number; priority_score?: number | null; priority_level: string; status: string; created_at?: string; }
+export interface MapResource { id: string; name: string; type: string; location: string; latitude?: number | null; longitude?: number | null; status: string; capacity?: number | null; occupied?: number | null; current_assignment?: string | null; contact?: string | null; last_updated?: string; is_demo?: boolean; }
+export interface MapRoute { id: number; incident_id: string; resource_id?: string | null; origin?: string | null; destination?: string | null; status: string; distance_m?: number | null; eta_seconds?: number | null; route_version?: number; geometry_source?: string | null; geometry: GeoJSONGeometry; }
+export interface MapAlert { id: number; zone_id?: string | null; region_id?: string | null; title: string; message: string; level: string; alert_type?: string | null; created_at?: string; geometry?: GeoJSONGeometry | null; is_demo?: boolean; }
+export type GeoJSONGeometry = { type: 'Point' | 'LineString' | 'Polygon'; coordinates: any; };
 
 
